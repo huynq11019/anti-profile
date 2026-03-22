@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings | The Obsidian Logic</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary-fixed": "#004a1d",
+                        "surface-container": "#171a1f",
+                        "tertiary-dim": "#5bf083",
+                        "primary-fixed": "#00e3fd",
+                        "tertiary-container": "#6bff8f",
+                        "surface-variant": "#23262c",
+                        "on-secondary-fixed": "#36404f",
+                        "error-dim": "#d7383b",
+                        "primary": "#81ecff",
+                        "outline": "#74757a",
+                        "surface": "#0c0e12",
+                        "primary-fixed-dim": "#00d4ec",
+                        "on-secondary": "#485262",
+                        "tertiary-fixed": "#6bff8f",
+                        "surface-bright": "#292c32",
+                        "on-tertiary-container": "#005f28",
+                        "on-primary-container": "#004d57",
+                        "on-secondary-fixed-variant": "#525c6c",
+                        "inverse-surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#cbd5e8",
+                        "secondary-container": "#3d4756",
+                        "on-error": "#490006",
+                        "inverse-primary": "#006976",
+                        "on-tertiary-fixed-variant": "#006a2d",
+                        "outline-variant": "#46484d",
+                        "on-secondary-container": "#c7d1e4",
+                        "secondary": "#d9e3f6",
+                        "secondary-fixed": "#d9e3f6",
+                        "on-primary-fixed-variant": "#005762",
+                        "tertiary": "#c5ffc9",
+                        "surface-container-lowest": "#000000",
+                        "on-primary": "#005762",
+                        "on-primary-fixed": "#003840",
+                        "on-surface": "#f6f6fc",
+                        "surface-container-highest": "#23262c",
+                        "surface-container-high": "#1d2025",
+                        "surface-tint": "#81ecff",
+                        "primary-dim": "#00d4ec",
+                        "inverse-on-surface": "#53555a",
+                        "error-container": "#9f0519",
+                        "error": "#ff716c",
+                        "primary-container": "#00e3fd",
+                        "tertiary-fixed-dim": "#5bf083",
+                        "background": "#0c0e12",
+                        "surface-dim": "#0c0e12",
+                        "secondary-dim": "#cbd5e8",
+                        "on-surface-variant": "#aaabb0",
+                        "on-background": "#f6f6fc",
+                        "surface-container-low": "#111318",
+                        "on-error-container": "#ffa8a3",
+                        "on-tertiary": "#00692c"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-sidebar { background: rgba(12, 14, 18, 0.8); backdrop-filter: blur(12px); }
+        .primary-gradient { background: linear-gradient(135deg, #81ecff 0%, #00d4ec 100%); }
+        .ghost-border { border: 1px solid rgba(70, 72, 77, 0.15); }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen selection:bg-primary selection:text-on-primary-fixed">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full w-[240px] z-50 glass-sidebar border-r border-white/5 font-['Inter'] antialiased tracking-tight shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-10 h-10 rounded-lg primary-gradient flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined" data-icon="fingerprint">fingerprint</span>
+</div>
+<div>
+<h1 class="text-[#81ecff] font-bold tracking-tighter text-xl leading-none">Obsidian Logic</h1>
+<p class="text-[10px] uppercase tracking-widest text-[#aaabb0] mt-1">Elite Operative</p>
+</div>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaabb0] hover:bg-white/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaabb0] hover:bg-white/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="language">language</span>
+<span class="text-sm">Browsers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaabb0] hover:bg-white/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="public">public</span>
+<span class="text-sm">Proxies</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaabb0] hover:bg-white/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+<span class="text-sm">Automation</span>
+</a>
+<!-- Active State: Settings -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#81ecff] border-l-2 border-[#81ecff] bg-white/5 font-semibold" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-sm">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#aaabb0] hover:bg-white/10 transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+<span class="text-sm">Support</span>
+</a>
+</nav>
+</div>
+<div class="absolute bottom-6 left-6 right-6">
+<button class="w-full py-3 primary-gradient text-on-primary-fixed font-semibold rounded-lg text-sm transition-all active:scale-[0.98]">
+                New Profile
+            </button>
+</div>
+</aside>
+<!-- TopNavBar (Shared Component) -->
+<header class="fixed top-0 right-0 w-[calc(100%-240px)] h-[60px] z-40 bg-[#0c0e12]/40 backdrop-blur-md px-6 flex items-center justify-between border-b border-white/5">
+<div class="flex items-center gap-4 text-[#aaabb0] font-['Inter'] uppercase tracking-widest text-[10px]">
+<span>System Status: <span class="text-[#c5ffc9]">Operational</span></span>
+<span class="w-1 h-1 rounded-full bg-white/20"></span>
+<span>Version: 4.2.0-Alpha</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="material-symbols-outlined text-[#aaabb0] hover:text-[#81ecff] cursor-pointer" data-icon="notifications">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full"></span>
+</div>
+<span class="material-symbols-outlined text-[#aaabb0] hover:text-[#81ecff] cursor-pointer" data-icon="fingerprint">fingerprint</span>
+<div class="flex items-center gap-2 hover:opacity-80 cursor-pointer transition-opacity">
+<span class="material-symbols-outlined text-primary" data-icon="account_circle">account_circle</span>
+<span class="text-[#aaabb0] text-[10px] tracking-widest uppercase">Operative_742</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] pt-[60px] min-h-screen bg-surface-container-low flex justify-center pb-20">
+<div class="w-full max-w-[800px] px-8 pt-12">
+<!-- Page Header -->
+<div class="mb-10">
+<h2 class="text-2xl font-bold text-on-surface tracking-tight font-headline">Global Settings</h2>
+<p class="text-on-surface-variant text-sm mt-1 font-body">Configure application behavior, licenses, and API keys</p>
+</div>
+<div class="space-y-6">
+<!-- Card 1: License Details -->
+<section class="bg-surface-container p-6 rounded-xl ghost-border relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6">
+<div>
+<h3 class="text-[10px] uppercase tracking-widest font-semibold text-on-surface-variant mb-2">License Details</h3>
+<div class="flex items-center gap-3">
+<span class="text-xl font-bold text-on-surface">Anti-Detech Pro Plan</span>
+<span class="bg-tertiary-container/10 text-tertiary px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border border-tertiary/20">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary shadow-[0_0_8px_#c5ffc9]"></span>
+                                    Active
+                                </span>
+</div>
+<p class="text-xs text-on-surface-variant mt-2">Valid until: <span class="text-on-surface">Dec 31, 2027</span></p>
+</div>
+<button class="px-4 py-2 border border-primary/30 text-primary text-xs font-semibold rounded hover:bg-primary/5 transition-colors">
+                            Renew License
+                        </button>
+</div>
+</section>
+<!-- Card 2: Application Settings -->
+<section class="bg-surface-container p-6 rounded-xl ghost-border">
+<h3 class="text-[10px] uppercase tracking-widest font-semibold text-on-surface-variant mb-6">Application Settings</h3>
+<div class="space-y-6">
+<div class="flex items-center justify-between">
+<div>
+<p class="text-sm font-medium text-on-surface">Launch on startup</p>
+<p class="text-xs text-on-surface-variant">Automatically start the application when the OS boots</p>
+</div>
+<button class="w-12 h-6 bg-primary-container rounded-full relative flex items-center px-1 transition-colors">
+<div class="w-4 h-4 bg-on-primary-fixed rounded-full ml-auto"></div>
+</button>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<p class="text-sm font-medium text-on-surface">Hardware Acceleration</p>
+<p class="text-xs text-on-surface-variant">Use GPU for rendering high-density profile data</p>
+</div>
+<button class="w-12 h-6 bg-primary-container rounded-full relative flex items-center px-1 transition-colors">
+<div class="w-4 h-4 bg-on-primary-fixed rounded-full ml-auto"></div>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+<div>
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Default Browser Core</label>
+<div class="relative">
+<select class="w-full bg-surface-container-highest border-none text-on-surface text-sm rounded-lg p-3 appearance-none focus:ring-1 focus:ring-primary transition-all cursor-pointer">
+<option>Chrome v114</option>
+<option>Chrome v116</option>
+<option>Firefox 118</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Local Data Directory</label>
+<div class="flex gap-2">
+<input class="flex-1 bg-surface-container-highest border-none text-on-surface text-sm rounded-lg p-3 focus:ring-1 focus:ring-primary transition-all" type="text" value="C:/Users/Admin/AppData/Local/ObsidianLogic"/>
+<button class="px-4 py-3 bg-surface-container-highest text-on-surface text-xs font-semibold rounded-lg hover:bg-surface-bright transition-colors border border-white/5">
+                                        Browse
+                                    </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Card 3: API Configuration -->
+<section class="bg-surface-container p-6 rounded-xl ghost-border">
+<div class="mb-6">
+<h3 class="text-[10px] uppercase tracking-widest font-semibold text-on-surface-variant mb-1">API Configuration</h3>
+<p class="text-xs text-on-surface-variant">Manage your local API port for external script integration</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div>
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Local API Port</label>
+<input class="w-full bg-surface-container-highest border-none text-on-surface text-sm rounded-lg p-3 focus:ring-1 focus:ring-primary transition-all" type="text" value="9222"/>
+</div>
+<div class="md:col-span-2">
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">Integration Key</label>
+<div class="flex gap-2">
+<div class="relative flex-1">
+<input class="w-full bg-surface-container-highest border-none text-on-surface text-sm rounded-lg p-3 focus:ring-1 focus:ring-primary transition-all pr-10" type="password" value="sk-obsidian-293849102384"/>
+<button class="absolute right-3 top-3 text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="content_copy">content_copy</span>
+</button>
+</div>
+<button class="px-4 py-3 border border-outline-variant text-on-surface text-xs font-semibold rounded-lg hover:bg-surface-bright transition-colors">
+                                    Regenerate
+                                </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer Actions -->
+<div class="flex items-center justify-between pt-6">
+<button class="text-error hover:text-error-dim transition-colors text-xs font-semibold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="warning">warning</span>
+                        Factory Reset
+                    </button>
+<button class="primary-gradient px-8 py-3 rounded-lg text-on-primary-fixed font-bold text-sm shadow-[0_0_20px_rgba(129,236,255,0.15)] hover:shadow-[0_0_30px_rgba(129,236,255,0.25)] transition-all active:scale-[0.98]">
+                        Save Changes
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Background Decorative Element (The Ghost) -->
+<div class="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
+<div class="absolute top-[20%] right-[-10%] w-[600px] h-[600px] bg-primary/5 blur-[120px] rounded-full"></div>
+<div class="absolute bottom-[-10%] left-[20%] w-[400px] h-[400px] bg-primary/5 blur-[100px] rounded-full"></div>
+</div>
+</body></html>

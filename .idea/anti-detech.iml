@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/af.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/am.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ar.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/bg.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/bn.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ca.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/cs.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/da.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/de.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/el.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/en.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/en_GB.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/es.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/es_419.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/et.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/fa.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/fi.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/fil.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/fr.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/gu.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/he.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/hi.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/hr.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/hu.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/id.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/it.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ja.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/kn.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ko.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/lt.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/lv.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ml.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/mr.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ms.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/nb.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/nl.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/pl.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/pt_BR.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/pt_PT.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ro.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ru.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/sk.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/sl.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/sr.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/sv.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/sw.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ta.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/te.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/th.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/tr.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/uk.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/ur.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/vi.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/zh_CN.lproj" />
+      <excludeFolder url="file://$MODULE_DIR$/node_modules/electron/dist/Electron.app/Contents/Resources/zh_TW.lproj" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

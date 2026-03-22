@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Anti-Detech | Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-fixed-variant": "#525c6c",
+              "on-tertiary-fixed-variant": "#006a2d",
+              "surface": "#0c0e12",
+              "error-dim": "#d7383b",
+              "primary-fixed-dim": "#00d4ec",
+              "secondary": "#d9e3f6",
+              "primary-dim": "#00d4ec",
+              "tertiary-container": "#6bff8f",
+              "inverse-primary": "#006976",
+              "error-container": "#9f0519",
+              "on-tertiary-container": "#005f28",
+              "surface-dim": "#0c0e12",
+              "tertiary-fixed-dim": "#5bf083",
+              "tertiary": "#c5ffc9",
+              "on-primary-fixed-variant": "#005762",
+              "on-primary": "#005762",
+              "on-secondary-fixed": "#36404f",
+              "surface-variant": "#23262c",
+              "secondary-dim": "#cbd5e8",
+              "on-background": "#f6f6fc",
+              "tertiary-fixed": "#6bff8f",
+              "primary": "#81ecff",
+              "on-secondary-container": "#c7d1e4",
+              "secondary-fixed": "#d9e3f6",
+              "on-surface-variant": "#aaabb0",
+              "on-error-container": "#ffa8a3",
+              "primary-fixed": "#00e3fd",
+              "primary-container": "#00e3fd",
+              "surface-tint": "#81ecff",
+              "on-tertiary-fixed": "#004a1d",
+              "surface-container-low": "#111318",
+              "surface-container-highest": "#23262c",
+              "background": "#0c0e12",
+              "inverse-surface": "#f9f9ff",
+              "secondary-container": "#3d4756",
+              "on-secondary": "#485262",
+              "outline": "#74757a",
+              "on-tertiary": "#00692c",
+              "surface-container-high": "#1d2025",
+              "surface-bright": "#292c32",
+              "tertiary-dim": "#5bf083",
+              "secondary-fixed-dim": "#cbd5e8",
+              "on-primary-container": "#004d57",
+              "inverse-on-surface": "#53555a",
+              "on-primary-fixed": "#003840",
+              "error": "#ff716c",
+              "surface-container-lowest": "#000000",
+              "surface-container": "#171a1f",
+              "on-surface": "#f6f6fc",
+              "outline-variant": "#46484d",
+              "on-error": "#490006"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+            line-height: 1;
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+        }
+        .status-glow {
+            box-shadow: 0 0 8px rgba(107, 255, 143, 0.4);
+        }
+        .hero-gradient {
+            background: linear-gradient(135deg, #111318 0%, #0c0e12 100%);
+        }
+        .btn-primary-gradient {
+            background: linear-gradient(135deg, #81ecff 0%, #00d4ec 100%);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0c0e12; }
+        ::-webkit-scrollbar-thumb { background: #23262c; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #292c32; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary/30 antialiased">
+<!-- TopNavBar (Shared Component) -->
+<header class="flex justify-between items-center px-6 w-full fixed z-50 bg-[#0c0e12] dark:bg-[#0c0e12] border-b border-white/5 shadow-[0_0_40px_rgba(0,0,0,0.5)] h-[60px] font-['Inter'] antialiased tracking-tight text-sm">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-white tracking-tighter uppercase">Anti-Detech</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-[#81ecff] font-bold transition-colors" href="#">Dashboard</a>
+<a class="text-[#aaabb0] hover:bg-[#292c32] hover:text-white transition-colors px-2 py-1 rounded" href="#">Profiles</a>
+<a class="text-[#aaabb0] hover:bg-[#292c32] hover:text-white transition-colors px-2 py-1 rounded" href="#">Automation</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 bg-primary-container text-on-primary-container px-4 py-1.5 rounded-lg font-bold hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Create Profile
+            </button>
+<div class="flex items-center gap-2">
+<button class="p-2 text-[#aaabb0] hover:bg-[#292c32] hover:text-white rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-[#aaabb0] hover:bg-[#292c32] hover:text-white rounded-full transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Abstract minimalist 3D user avatar portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC50OMQnForaCCPCIdes0NN32P_1klsF16c0U8FnzShf6pNDUQ3E5Y4WdSFLG25cZMaUvh2YBPjPBEon5ePg8_6awj8xzZStJ3uxFHJWoqKmKoZnSSbXYdpILMEVFc1TL7hmJLw-VeFZ86XPE8qcBv8rptcZBCeYvlAaUBRm29YQD5dkDvmhZt3NOl9ETkuxqduen9mUw8tIs-Nqw14W3_RVxUe-rQ3pHarQNFK3kQbpTSHR0VThDYjBU-Qhi-WUwgbFc3QwijsrT0"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-[60px] w-[240px] h-[calc(100vh-60px)] glass-sidebar border-r border-white/5 z-40 hidden md:flex flex-col pt-4 font-['Inter'] text-[0.875rem] font-medium">
+<nav class="flex-1 space-y-1 px-3">
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#81ecff] bg-[#1d2025] border-l-2 border-[#81ecff] shadow-[0_0_8px_rgba(129,236,255,0.2)] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="person_pin">person_pin</span>
+<span>Profiles</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="vpn_lock">vpn_lock</span>
+<span>Proxy Manager</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="auto_mode">auto_mode</span>
+<span>Automation</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="cookie">cookie</span>
+<span>Cookies</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+<span>Extensions</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>Logs</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-4 rounded-lg text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="p-6 border-t border-white/5">
+<div class="flex items-center justify-between">
+<div>
+<p class="text-white font-bold text-sm">Anti-Detech</p>
+<p class="text-[#aaabb0] text-[10px] uppercase tracking-widest">Version v1.0</p>
+</div>
+<div class="w-2 h-2 rounded-full bg-tertiary status-glow"></div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-[240px] pt-[60px] min-h-screen pb-20">
+<!-- Hero Section -->
+<section class="h-[160px] hero-gradient flex items-center px-10 border-b border-outline-variant/10 relative overflow-hidden">
+<!-- Background Decorative Glint -->
+<div class="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
+<div class="flex-1">
+<h1 class="text-[28px] font-bold text-white leading-tight">Manage your anonymous browser profiles securely</h1>
+<p class="text-on-surface-variant text-base mt-1">Anti-fingerprint browser profiles with proxy, cookie and automation control</p>
+</div>
+<div class="flex gap-4">
+<!-- Stat Cards -->
+<div class="bg-surface-container-high border border-outline-variant px-5 py-4 rounded-xl min-w-[140px] relative">
+<p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Profiles</p>
+<h3 class="text-2xl font-bold text-white">128</h3>
+</div>
+<div class="bg-surface-container-high border border-outline-variant px-5 py-4 rounded-xl min-w-[140px] relative">
+<p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Active</p>
+<div class="flex items-center gap-2">
+<h3 class="text-2xl font-bold text-white">36</h3>
+<span class="w-2 h-2 rounded-full bg-tertiary status-glow animate-pulse"></span>
+</div>
+</div>
+<div class="bg-surface-container-high border border-outline-variant px-5 py-4 rounded-xl min-w-[140px] relative">
+<p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Proxies</p>
+<h3 class="text-2xl font-bold text-white">54</h3>
+</div>
+<div class="bg-surface-container-high border border-outline-variant px-5 py-4 rounded-xl min-w-[140px] relative">
+<p class="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">Automations</p>
+<h3 class="text-2xl font-bold text-white">8</h3>
+</div>
+</div>
+</section>
+<!-- Profiles Section -->
+<section class="p-8">
+<!-- Toolbar -->
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 border border-primary text-primary px-5 py-2 rounded-lg font-semibold hover:bg-primary/5 transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        New Profile
+                    </button>
+<button class="flex items-center gap-2 bg-surface-container-highest text-on-surface border border-outline-variant/30 px-5 py-2 rounded-lg font-medium hover:bg-surface-bright transition-colors">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+                        Import
+                    </button>
+<div class="relative group">
+<button class="flex items-center gap-2 bg-surface-container-highest text-on-surface border border-outline-variant/30 px-5 py-2 rounded-lg font-medium hover:bg-surface-bright transition-colors">
+                            Bulk Action
+                            <span class="material-symbols-outlined text-[18px]">expand_more</span>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="bg-surface-container-highest border-none focus:ring-1 focus:ring-primary rounded-lg pl-10 pr-4 py-2 w-[280px] text-sm text-on-surface" placeholder="Search profiles..." type="text"/>
+</div>
+<button class="p-2 bg-surface-container-highest border border-outline-variant/30 rounded-lg text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">filter_alt</span>
+</button>
+<button class="p-2 bg-surface-container-highest border border-outline-variant/30 rounded-lg text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">sort</span>
+</button>
+</div>
+</div>
+<!-- Profiles Table -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/10 shadow-2xl">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-high/50 text-on-surface-variant">
+<tr>
+<th class="py-4 px-6 w-10">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface" type="checkbox"/>
+</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Status</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Profile Name</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Browser</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Proxy</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Fingerprint</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Tags</th>
+<th class="py-4 px-4 font-semibold text-[10px] uppercase tracking-widest">Last Used</th>
+<th class="py-4 px-6 text-right font-semibold text-[10px] uppercase tracking-widest">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary status-glow"></span>
+<span class="text-[11px] font-bold text-tertiary">Running</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">FB_Shop_Account_01</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDUjaYNRe2KbJ0tf7dxSJx3zJxAwipkthYTyQhc5SQuoyDBUKElGnwzgUyPnOYpDIq_6erdO81qDqjvR_SwZU4DNLiT4u4hzbGbIP1Nsds_HuHVaJBa6_einfAIVn9fW8V8EivToMnxH7LAt6an12Fpa75wAujl0fy7VKerhZVRCU8loGNplmFjt48-qG8lFza1vn96tPdIgT2Df60kCAJ8shJ92fjY1UKOcrzVkix5xi9IMm-ZhpeRQfVRclxtdmphoBpE2dTgvcI"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">US</span>
+<span class="text-xs font-mono text-on-surface-variant">45.234.12.111</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">a3f1b2...7d</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">facebook</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">2 min ago</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="text-[11px] font-bold text-on-surface-variant">Idle</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">ShopeeVN_Seller_02</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFTLiR9O9UUfteu7IMogHi_N42Gqfcwgi1pFASGrNkY0nrIv3njkSRaKloXHT2_niOPrTpIaMvk0b-iMFQiXjbMNxkxsVOaNi02jNQMe8j93XzsWi7Y94-7LFbjHad7RAaZijiSCEEU12_HM9454C8NqYFJ4Yc2aUDOOz4nNw55KXbVjBURHMp6CwvtMy3WVarvti6CIJiGySd_Czl4P_X8CibuXxLhO1AuZQmstdC2ei516KNQxl5ShLv6FnmwfqefhL53MROzqo"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">VN</span>
+<span class="text-xs font-mono text-on-surface-variant">103.23.45.67</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">c8d2e1...12</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">shopee</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">1 hour ago</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="text-[11px] font-bold text-on-surface-variant">Idle</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">Ads_Master_UK_01</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTa-GJWETN90Q2VZMQl32cPyoptcgxprx8Q0SXc07UmhycVW_5Kpwd2MEyumi2bB3hf4JfmbP050z5M3ZeHwFftdgypiDeFQBvwkily1W89fQDZEPCWZumW4c0UsLeFVsdw9v9dBfsrRUB0okk97dvZ8l2V78gQkcl8gBw6nG7iW54oE5UVPlJPqhNuylOi27GPacPNj2tL_NeGVMLIETrScRynjYMPPyqucZ2pbyQO3KirJISZdInmAQZqpSpq7iaaIecAfWqLrU"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">UK</span>
+<span class="text-xs font-mono text-on-surface-variant">82.165.34.12</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">f4e9d3...88</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">google-ads</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">4 hours ago</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary status-glow"></span>
+<span class="text-[11px] font-bold text-tertiary">Running</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">Amazon_Review_Gen_04</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDP76TBO6TFqji2fcKikZrqyR6r91EB99wLEq6Xn6auDnt5xT1vo6-6qC8opGuDPG6XrrK2pE858-eapMr4DkDxNrsiESTtzYxQdZTRlNLH5rQH7g4YBS-E9ULxrDwr-7hzYRdlOiT5bvmbndWZE29e00JmLe8Q_366kKg3aumMVQWofkXbU_ZKwXDdAE5L1jEbC4uP-WcPts3FerHpe_L4RGjMDkMMKkxCi1zsdk1mO7AbjsF5J-OvMY7xTDYc07IcvoQqdEpRVKE"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">DE</span>
+<span class="text-xs font-mono text-on-surface-variant">52.12.99.101</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">bb9e21...cc</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">amazon</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">Just now</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="text-[11px] font-bold text-on-surface-variant">Idle</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">Tiktok_Proxy_01</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkdklkpOgefhCy-FQqESVIsEOXPZHqBJphjUcL9hEkuraMBy-fi_ERd15mP8iN7ekQF7GdyoiL-ZyihE0SvLA8YUdU8YCbkbMVTaNZka836R3ogfT1eitejepve_PehpaOVatS77BJ1LtMK4YRHH13z9HrJ12pZactAzShnTNGNY5bTE0BhTYpJ-Ns8CBe6CiQm6hkiNFpw5_syR8HzmoTCCaoWyMQDzkttiAsrXpELDG-2cSRL7Vek24Xja_PepN_sfRCqdJ52S4"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">BR</span>
+<span class="text-xs font-mono text-on-surface-variant">177.34.21.19</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">a012b1...fe</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">tiktok</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">Yesterday</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-bright transition-colors group border-l-2 border-transparent hover:border-primary">
+<td class="py-4 px-6">
+<input class="rounded bg-surface border-outline-variant text-primary focus:ring-primary" type="checkbox"/>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="text-[11px] font-bold text-on-surface-variant">Idle</span>
+</div>
+</td>
+<td class="py-4 px-4 font-semibold text-white">Etsy_Shop_Account_09</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<img alt="Chrome" class="w-4 h-4" data-alt="Official Google Chrome browser icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9BRSovaiSo87Ex3Kg5JfIC0Df9DmL34B5gaNVcelp2Urug6bql8V6C2m4lU6cUuSjjnTM-KoUjequ23dXZ0Ivv2AWGYD4CSuYQCi1WIwb7pbREYgDb4A5GKqFxAWbbcRXpO-PEQ7FDL3BP2Kilg-eRRiDTNZt1ugPM5-ernvRtOX8o0MwJJb2GhF9WK9C8Df2VCpl1ZE8Uu9tJOE1jg71KFimOk-9edwoKZoA3pvtTPhXXAaAdSHq4aEd6VxZZACv1y8AwXufBw8"/>
+<span class="text-xs">Chrome v114</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-2">
+<span class="text-[10px] px-1.5 py-0.5 bg-secondary-container text-secondary rounded">FR</span>
+<span class="text-xs font-mono text-on-surface-variant">91.12.112.55</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="text-[11px] font-mono text-outline">d7e3c1...91</span>
+</td>
+<td class="py-4 px-4">
+<span class="text-[10px] px-2 py-1 bg-surface-container-highest border border-outline-variant/30 rounded text-primary">etsy</span>
+</td>
+<td class="py-4 px-4 text-xs text-on-surface-variant">2 days ago</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2">
+<button class="text-xs font-bold text-on-primary-fixed bg-primary px-3 py-1 rounded hover:opacity-80 transition-opacity">Start</button>
+<button class="p-1.5 text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="mt-6 flex items-center justify-between">
+<p class="text-xs text-on-surface-variant">Showing 1-6 of 128 profiles</p>
+<div class="flex items-center gap-2">
+<button class="p-2 border border-outline-variant/30 rounded-lg text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary text-on-primary-fixed font-bold text-xs">1</button>
+<button class="w-8 h-8 rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors text-xs font-bold">2</button>
+<button class="w-8 h-8 rounded-lg text-on-surface-variant hover:bg-surface-container-highest transition-colors text-xs font-bold">3</button>
+<button class="p-2 border border-outline-variant/30 rounded-lg text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="fixed bottom-4 right-6 flex gap-4 items-center justify-end font-['Inter'] text-[0.6875rem] font-semibold uppercase tracking-wider bg-transparent text-[#aaabb0] opacity-80 hover:opacity-100 transition-opacity">
+<span class="text-[#aaabb0]">Anti-Detech © 2026</span>
+<div class="h-1 w-1 bg-[#aaabb0] rounded-full"></div>
+<a class="hover:text-[#81ecff] underline-offset-4" href="#">Docs</a>
+<a class="hover:text-[#81ecff] underline-offset-4" href="#">API</a>
+<a class="hover:text-[#81ecff] underline-offset-4" href="#">Support</a>
+</footer>
+</body></html>

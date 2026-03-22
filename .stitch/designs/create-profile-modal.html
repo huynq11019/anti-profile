@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Anti-Detech | Create Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#f6f6fc",
+              "error": "#ff716c",
+              "primary-dim": "#00d4ec",
+              "on-error-container": "#ffa8a3",
+              "secondary-fixed-dim": "#cbd5e8",
+              "tertiary-fixed": "#6bff8f",
+              "secondary-dim": "#cbd5e8",
+              "surface-container-lowest": "#000000",
+              "surface-container": "#171a1f",
+              "outline-variant": "#46484d",
+              "on-surface-variant": "#aaabb0",
+              "on-secondary": "#485262",
+              "secondary-container": "#3d4756",
+              "on-background": "#f6f6fc",
+              "on-tertiary-fixed": "#004a1d",
+              "on-secondary-fixed": "#36404f",
+              "primary-container": "#00e3fd",
+              "on-secondary-fixed-variant": "#525c6c",
+              "primary": "#81ecff",
+              "surface-variant": "#23262c",
+              "surface-tint": "#81ecff",
+              "tertiary": "#c5ffc9",
+              "secondary-fixed": "#d9e3f6",
+              "on-tertiary-fixed-variant": "#006a2d",
+              "surface-dim": "#0c0e12",
+              "surface-bright": "#292c32",
+              "secondary": "#d9e3f6",
+              "tertiary-fixed-dim": "#5bf083",
+              "on-secondary-container": "#c7d1e4",
+              "on-error": "#490006",
+              "primary-fixed-dim": "#00d4ec",
+              "on-tertiary-container": "#005f28",
+              "on-tertiary": "#00692c",
+              "tertiary-dim": "#5bf083",
+              "error-dim": "#d7383b",
+              "inverse-surface": "#f9f9ff",
+              "surface": "#0c0e12",
+              "tertiary-container": "#6bff8f",
+              "on-primary-fixed-variant": "#005762",
+              "inverse-primary": "#006976",
+              "error-container": "#9f0519",
+              "primary-fixed": "#00e3fd",
+              "on-primary-container": "#004d57",
+              "surface-container-low": "#111318",
+              "surface-container-highest": "#23262c",
+              "background": "#0c0e12",
+              "inverse-on-surface": "#53555a",
+              "on-primary": "#005762",
+              "on-primary-fixed": "#003840",
+              "outline": "#74757a",
+              "surface-container-high": "#1d2025"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .input-focus-glow:focus {
+            border-color: #81ecff;
+            box-shadow: 0 0 8px rgba(129,236,255,0.3);
+            outline: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #46484d;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary/30 antialiased overflow-hidden">
+<!-- Dashboard Background (Underlay) -->
+<div class="fixed inset-0 z-0 flex overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-[240px] h-screen bg-white/5 backdrop-blur-xl border-r border-white/5 flex flex-col pt-4 z-10">
+<div class="px-6 mb-8">
+<h1 class="text-lg font-bold text-white tracking-tighter">Anti-Detech</h1>
+<p class="text-[0.625rem] text-primary font-bold tracking-widest uppercase">v1.0</p>
+</div>
+<nav class="flex flex-col space-y-1">
+<a class="flex items-center gap-3 py-3 px-6 text-[#81ecff] bg-[#1d2025] border-l-2 border-[#81ecff] shadow-[0_0_8px_rgba(129,236,255,0.2)] transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg">dashboard</span>
+<span class="text-[0.875rem] font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-6 text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg">person_pin</span>
+<span class="text-[0.875rem] font-medium">Profiles</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-6 text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg">vpn_lock</span>
+<span class="text-[0.875rem] font-medium">Proxy Manager</span>
+</a>
+<a class="flex items-center gap-3 py-3 px-6 text-[#aaabb0] hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined text-lg">auto_mode</span>
+<span class="text-[0.875rem] font-medium">Automation</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area (Blurred) -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="h-[60px] bg-[#0c0e12] border-b border-white/5 flex justify-between items-center px-6 w-full z-20">
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-highest px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20">
+<span class="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 text-on-surface" placeholder="Search profiles..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-[#aaabb0] hover:text-white transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant/30 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="User Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxUbEkm07oJ9wW9EBaMAC3FngNB0c55DHMlcVyiqW_bgZtDxfIQufrDK-gFoxEmqHQULjixHguKAnodAkN00aDGm_qtBQC4IdXXD61bOhGkGYSnrqlcKAs_BgfCwQIYNOy65kpylCxD6CT78AHNgzvz6NdWLGlylMAKpmiev5ovwpBYy2Huer_0LoSf5O42H_sdPkQVOqCpXKmi6pOYu6NpMjBNBeRcMt1af1lr6YMPM03cC2njZUOT5a3uep7vqrb6aOwDa6ExHs"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<section class="p-8 space-y-8 blur-sm grayscale-[0.2]">
+<div class="grid grid-cols-4 gap-6">
+<div class="bg-surface-container-low p-5 rounded-xl border border-outline-variant/10 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent"></div>
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">Active Profiles</p>
+<h3 class="text-3xl font-black text-white">42</h3>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl border border-outline-variant/10 relative overflow-hidden">
+<p class="text-on-surface-variant text-xs font-semibold uppercase tracking-wider mb-2">Proxies Online</p>
+<h3 class="text-3xl font-black text-white">128</h3>
+</div>
+</div>
+<!-- Mock Table -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden border border-outline-variant/10">
+<div class="p-4 border-b border-outline-variant/10 flex justify-between items-center">
+<h2 class="font-bold text-white">Recent Profiles</h2>
+</div>
+<div class="h-64 bg-surface-container/50"></div>
+</div>
+</section>
+</main>
+</div>
+<!-- Modal Backdrop -->
+<div class="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+<!-- Modal Container -->
+<div class="w-full max-w-[720px] bg-surface-container-high rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-outline-variant/20 overflow-hidden flex flex-col">
+<!-- Modal Header -->
+<div class="px-8 py-6 border-b border-outline-variant/10 flex justify-between items-start">
+<div>
+<h2 class="text-2xl font-bold text-white tracking-tight font-headline">Create New Profile</h2>
+<p class="text-on-surface-variant text-sm mt-1">Configure a unique browser identity</p>
+</div>
+<button class="text-on-surface-variant hover:text-white transition-colors p-1">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<div class="px-8 py-8 overflow-y-auto custom-scrollbar max-h-[716px]">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+<!-- Left Column -->
+<div class="space-y-6">
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Profile Name</label>
+<input class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all" placeholder="e.g. Facebook_US_01" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Browser Type</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all">
+<option>Chrome v114 (Default)</option>
+<option>Firefox v109</option>
+<option>Safari v16.5</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">User Agent</label>
+<input class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all" placeholder="Auto-generate from browser type" type="text"/>
+</div>
+<div class="pt-2">
+<div class="flex items-center justify-between mb-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Fingerprint Randomizer</label>
+<button class="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-dim transition-colors group">
+<span class="material-symbols-outlined text-sm group-active:rotate-180 transition-transform duration-300">casino</span>
+                                    Randomize
+                                </button>
+</div>
+<div class="bg-surface-container-highest border border-outline-variant/10 rounded-lg p-3">
+<code class="text-[0.75rem] font-mono text-on-surface-variant break-all">a3f1b2c8d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f</code>
+<div class="mt-2 flex gap-1">
+<div class="h-1 flex-1 bg-primary/20 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-2/3"></div>
+</div>
+<div class="h-1 flex-1 bg-primary/20 rounded-full"></div>
+<div class="h-1 flex-1 bg-primary/20 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column -->
+<div class="space-y-6">
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Proxy</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all">
+<option>No Proxy (Default)</option>
+<option>HTTP Proxy</option>
+<option>SOCKS5 Proxy</option>
+<option>SSH Tunnel</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none">vpn_lock</span>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Timezone</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all">
+<option>(GMT-05:00) Eastern Time</option>
+<option>(GMT+00:00) UTC</option>
+<option>(GMT+01:00) Berlin</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none">schedule</span>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Tags</label>
+<div class="flex flex-wrap gap-2 mb-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded border border-primary/50 bg-primary/5 text-[0.625rem] font-bold text-primary">SOCIAL</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded border border-primary/50 bg-primary/5 text-[0.625rem] font-bold text-primary">MARKETING</span>
+</div>
+<input class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all" placeholder="Add tags... press Enter" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="text-[0.6875rem] font-semibold uppercase tracking-widest text-on-surface-variant">Notes</label>
+<textarea class="w-full bg-surface-container-highest border border-outline-variant/30 rounded-lg px-4 py-2.5 text-on-surface text-sm input-focus-glow transition-all resize-none" placeholder="Optional notes about this profile" rows="3"></textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-8 py-6 bg-surface-container border-t border-outline-variant/10 flex justify-end items-center gap-4">
+<button class="text-on-surface-variant font-semibold text-sm hover:text-white transition-colors py-2 px-4">
+                    Cancel
+                </button>
+<button class="bg-gradient-to-br from-primary to-primary-dim text-on-primary-fixed font-bold text-sm px-6 py-2.5 rounded-lg shadow-[0_0_15px_rgba(129,236,255,0.3)] hover:brightness-110 active:scale-95 transition-all">
+                    Create Profile
+                </button>
+</div>
+</div>
+</div>
+<!-- Footer Copyright (Shell Component) -->
+<footer class="fixed bottom-4 right-6 flex gap-4 items-center justify-end z-[50]">
+<div class="flex gap-4 text-[#aaabb0] font-['Inter'] text-[0.6875rem] font-semibold uppercase tracking-wider">
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">Docs</a>
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">API</a>
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">Support</a>
+</div>
+<span class="text-[#aaabb0] font-['Inter'] text-[0.6875rem] font-semibold uppercase tracking-wider opacity-60">Anti-Detech © 2026</span>
+</footer>
+</body></html>

@@ -1,0 +1,80 @@
+{
+  "name": "projects/1426008087346202043",
+  "projectId": "1426008087346202043",
+  "title": "Anti-Detech Browser Manager",
+  "visibility": "PRIVATE",
+  "createTime": "2026-03-21T19:09:44.392243Z",
+  "updateTime": "2026-03-21T19:09:44.392243Z",
+  "projectType": "PROJECT_DESIGN",
+  "origin": "STITCH",
+  "deviceType": "DESKTOP",
+  "designTheme": {
+    "colorMode": "DARK",
+    "font": "INTER",
+    "roundness": "ROUND_EIGHT",
+    "customColor": "#00E5FF",
+    "headlineFont": "INTER",
+    "bodyFont": "INTER",
+    "labelFont": "INTER",
+    "designSystemName": "Cyber Shield"
+  },
+  "screens": {
+    "dashboard": {
+      "id": "c301ce32451946a0986f96a501afb712",
+      "sourceScreen": "projects/1426008087346202043/screens/c301ce32451946a0986f96a501afb712",
+      "x": 0,
+      "y": 0,
+      "width": 2560,
+      "height": 2048,
+      "title": "Anti-Detech Dashboard"
+    },
+    "create-profile-modal": {
+      "id": "ae05b46a1e75454fb5635b94abfa997f",
+      "sourceScreen": "projects/1426008087346202043/screens/ae05b46a1e75454fb5635b94abfa997f",
+      "x": 2700,
+      "y": 0,
+      "width": 2560,
+      "height": 2048,
+      "title": "Create Profile Modal"
+    },
+    "proxy-manager": {
+      "id": "b90a08996c3d4af3b5ac943d4fa85cf7",
+      "sourceScreen": "projects/1426008087346202043/screens/b90a08996c3d4af3b5ac943d4fa85cf7",
+      "x": 5400,
+      "y": 0,
+      "width": 2560,
+      "height": 2348,
+      "title": "Proxy Manager"
+    },
+    "automation": {
+      "id": "763fc83860474da6bb8376111821a066",
+      "sourceScreen": "projects/1426008087346202043/screens/763fc83860474da6bb8376111821a066",
+      "x": 8100,
+      "y": 0,
+      "width": 2560,
+      "height": 2250,
+      "title": "Automation Scripts"
+    },
+    "cookies": {
+      "id": "ac24affcb1dd4af591b07e11c29fd8ee",
+      "sourceScreen": "projects/1426008087346202043/screens/ac24affcb1dd4af591b07e11c29fd8ee",
+      "x": 10800,
+      "y": 0,
+      "width": 3072,
+      "height": 2048,
+      "title": "Cookies Management"
+    },
+    "settings": {
+      "id": "9070e0235ee746918fe98b96b7180aa7",
+      "sourceScreen": "projects/1426008087346202043/screens/9070e0235ee746918fe98b96b7180aa7",
+      "x": 13800,
+      "y": 0,
+      "width": 2560,
+      "height": 2070,
+      "title": "Settings"
+    }
+  },
+  "metadata": {
+    "userRole": "OWNER"
+  }
+}

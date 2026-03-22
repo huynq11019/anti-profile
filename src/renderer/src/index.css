@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Cyber Shield Global Styles ===== */
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #0c0e12;
+  color: #f6f6fc;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* Custom scrollbar - Cyber Shield style */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #111318;
+}
+::-webkit-scrollbar-thumb {
+  background: #292c32;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #46484d;
+}
+
+/* Base style overrides */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+
+/* Primary gradient button utility */
+@layer components {
+  .btn-primary {
+    @apply bg-primary-gradient text-on-primary-fixed font-semibold text-sm
+           px-4 py-2 rounded hover:opacity-90 transition-opacity duration-150;
+  }
+  .btn-secondary {
+    @apply bg-surface-container-highest border border-outline-variant text-on-surface
+           font-semibold text-sm px-4 py-2 rounded hover:bg-surface-bright transition-colors duration-150;
+  }
+  .btn-danger {
+    @apply text-error border border-error font-semibold text-sm
+           px-4 py-2 rounded hover:bg-error/10 transition-colors duration-150;
+  }
+  .glassmorphism {
+    @apply bg-white/[0.04] backdrop-blur-glass border border-white/[0.05];
+  }
+  .table-row-hover {
+    @apply hover:bg-surface-bright hover:border-l-2 hover:border-l-primary transition-colors duration-100;
+  }
+  .status-dot-active {
+    @apply w-2 h-2 rounded-full bg-tertiary shadow-glow-green;
+  }
+  .status-dot-error {
+    @apply w-2 h-2 rounded-full bg-error;
+  }
+  .status-dot-idle {
+    @apply w-2 h-2 rounded-full bg-on-surface-variant;
+  }
+}

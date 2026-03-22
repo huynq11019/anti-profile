@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Anti-Detech | Proxy Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-fixed": "#00e3fd",
+                        "secondary-container": "#3d4756",
+                        "tertiary": "#c5ffc9",
+                        "on-secondary-fixed": "#36404f",
+                        "tertiary-fixed": "#6bff8f",
+                        "on-background": "#f6f6fc",
+                        "surface-dim": "#0c0e12",
+                        "secondary": "#d9e3f6",
+                        "on-tertiary-fixed-variant": "#006a2d",
+                        "primary-fixed-dim": "#00d4ec",
+                        "error": "#ff716c",
+                        "primary-dim": "#00d4ec",
+                        "secondary-fixed-dim": "#cbd5e8",
+                        "on-surface-variant": "#aaabb0",
+                        "on-primary-fixed-variant": "#005762",
+                        "inverse-on-surface": "#53555a",
+                        "on-secondary-fixed-variant": "#525c6c",
+                        "surface-tint": "#81ecff",
+                        "on-primary-fixed": "#003840",
+                        "surface-variant": "#23262c",
+                        "primary-container": "#00e3fd",
+                        "outline": "#74757a",
+                        "on-secondary-container": "#c7d1e4",
+                        "tertiary-dim": "#5bf083",
+                        "tertiary-container": "#6bff8f",
+                        "surface-container-highest": "#23262c",
+                        "on-tertiary-fixed": "#004a1d",
+                        "background": "#0c0e12",
+                        "on-tertiary-container": "#005f28",
+                        "on-error-container": "#ffa8a3",
+                        "on-primary": "#005762",
+                        "tertiary-fixed-dim": "#5bf083",
+                        "surface-container-low": "#111318",
+                        "on-secondary": "#485262",
+                        "error-dim": "#d7383b",
+                        "on-primary-container": "#004d57",
+                        "surface": "#0c0e12",
+                        "on-error": "#490006",
+                        "surface-container": "#171a1f",
+                        "primary": "#81ecff",
+                        "error-container": "#9f0519",
+                        "surface-container-lowest": "#000000",
+                        "inverse-primary": "#006976",
+                        "on-surface": "#f6f6fc",
+                        "inverse-surface": "#f9f9ff",
+                        "on-tertiary": "#00692c",
+                        "secondary-fixed": "#d9e3f6",
+                        "surface-bright": "#292c32",
+                        "surface-container-high": "#1d2025",
+                        "outline-variant": "#46484d",
+                        "secondary-dim": "#cbd5e8"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glow-tertiary {
+            box-shadow: 0 0 8px rgba(197, 255, 201, 0.4);
+        }
+        .glow-error {
+            box-shadow: 0 0 8px rgba(255, 113, 108, 0.4);
+        }
+        .glass-sidebar {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #23262c; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased selection:bg-primary/30">
+<!-- TopNavBar -->
+<header class="bg-[#0c0e12] dark:bg-[#0c0e12] text-[#81ecff] dark:text-[#81ecff] font-['Inter'] antialiased tracking-tight text-sm docked full-width top-0 h-[60px] border-b border-white/5 shadow-[0_0_40px_rgba(0,0,0,0.5)] flex justify-between items-center px-6 w-full fixed z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-white tracking-tighter">Anti-Detech</span>
+<div class="hidden md:flex items-center bg-surface-container-highest px-3 py-1.5 rounded-lg border border-white/5">
+<span class="material-symbols-outlined text-on-surface-variant text-sm mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-48 text-on-surface" placeholder="Quick search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-gradient-to-br from-primary to-primary-dim text-on-primary-fixed px-4 py-1.5 rounded-lg font-bold text-xs hover:scale-95 transition-all duration-150">Create Profile</button>
+<div class="flex items-center gap-3 ml-2">
+<span class="material-symbols-outlined text-[#aaabb0] hover:bg-[#292c32] hover:text-white p-2 rounded-lg cursor-pointer transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-[#aaabb0] hover:bg-[#292c32] hover:text-white p-2 rounded-lg cursor-pointer transition-colors" data-icon="settings">settings</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-white/10 overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Cyberpunk style character avatar for user profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzwKKDGpDILPSznTecQdVFcoMpdpPmzeSZURVxNWLHkzzPPrP8b55dQNz3W_-vJM9wTCOC6BgRjp2QyTYoIpM47hmLMR3xVTlv8_eIqWH6s13C2-2Cz2lW615ZSWU4lCi21ZS4dvRwSvUd4FxOTlPeM11jPXboqtHZH6hmD8XrV7TcOV7B1xTTPyzSudMDoobOnQ5aQHP6i5ChN6B7pMSo1MKo823rADgvErKsTotly5MQ4l1EyjYE_vdSt9TZqG-Oscz_UYypH4k"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="bg-white/5 backdrop-blur-xl text-[#81ecff] font-['Inter'] text-[0.875rem] font-medium fixed left-0 top-[60px] w-[240px] h-[calc(100vh-60px)] border-r border-white/5 flex flex-col pt-4 z-40 glass-sidebar">
+<div class="px-6 mb-6">
+<p class="text-[0.6875rem] font-semibold uppercase tracking-wider text-on-surface-variant opacity-50">Navigation</p>
+</div>
+<div class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="person_pin">person_pin</span>
+                Profiles
+            </a>
+<!-- Active Tab: Proxy Manager -->
+<a class="flex items-center gap-3 text-[#81ecff] bg-[#1d2025] border-l-2 border-[#81ecff] shadow-[0_0_8px_rgba(129,236,255,0.2)] py-3 px-6 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="vpn_lock" style="font-variation-settings: 'FILL' 1;">vpn_lock</span>
+                Proxy Manager
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="auto_mode">auto_mode</span>
+                Automation
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="cookie">cookie</span>
+                Cookies
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="extension">extension</span>
+                Extensions
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+                Logs
+            </a>
+<a class="flex items-center gap-3 text-[#aaabb0] py-3 px-6 hover:bg-[#171a1f] hover:text-[#81ecff] transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                Settings
+            </a>
+</div>
+<div class="p-6 mt-auto">
+<div class="bg-surface-container-high rounded-lg p-3 border border-white/5">
+<div class="flex justify-between items-center mb-1">
+<span class="text-[0.6875rem] text-on-surface-variant font-bold">V1.0 STABLE</span>
+<span class="w-2 h-2 rounded-full bg-tertiary glow-tertiary"></span>
+</div>
+<div class="h-1 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary w-3/4"></div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="ml-[240px] pt-[60px] min-h-screen">
+<div class="p-8 max-w-[1400px] mx-auto">
+<!-- Page Header Section -->
+<section class="h-[80px] flex items-center justify-between mb-8">
+<div>
+<h1 class="text-2xl font-bold tracking-tight text-white headline-sm">Proxy Manager</h1>
+<p class="text-sm text-on-surface-variant body-md">Manage your centralized proxy pool</p>
+</div>
+<div class="flex gap-3">
+<button class="bg-surface-container-highest border border-outline-variant text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-surface-bright transition-colors">
+                        Import List
+                    </button>
+<button class="bg-gradient-to-r from-primary to-primary-dim text-on-primary-fixed px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-primary/10 hover:scale-[0.98] transition-transform flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+                        Add Proxy
+                    </button>
+</div>
+</section>
+<!-- Stats Bar -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<div class="bg-surface-container-low p-5 rounded-xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent"></div>
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Total Proxies</p>
+<div class="flex items-end gap-2">
+<span class="text-4xl font-black text-white leading-none">54</span>
+<span class="text-on-surface-variant text-sm font-medium mb-1">Endpoints</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-tertiary/10 to-transparent"></div>
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Active</p>
+<div class="flex items-end gap-2">
+<span class="text-4xl font-black text-tertiary leading-none">36</span>
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary mb-2"></div>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-error/10 to-transparent"></div>
+<p class="text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Failed</p>
+<div class="flex items-end gap-2">
+<span class="text-4xl font-black text-error leading-none">3</span>
+<div class="w-2.5 h-2.5 rounded-full bg-error glow-error mb-2"></div>
+</div>
+</div>
+</section>
+<!-- Proxy Table Section -->
+<section class="bg-surface-container-low rounded-xl overflow-hidden shadow-2xl">
+<!-- Toolbar -->
+<div class="p-4 flex flex-wrap items-center justify-between gap-4 border-b border-white/5 bg-surface-container">
+<div class="flex items-center gap-4 flex-1 max-w-xl">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg" data-icon="search">search</span>
+<input class="w-full bg-surface-container-highest border-none focus:ring-1 focus:ring-primary/30 rounded-lg pl-10 pr-4 py-2 text-sm text-on-surface" placeholder="Search by alias, host or port..." type="text"/>
+</div>
+<select class="bg-surface-container-highest border-none focus:ring-1 focus:ring-primary/30 rounded-lg py-2 pl-4 pr-10 text-sm text-on-surface appearance-none cursor-pointer">
+<option>All Protocols</option>
+<option>HTTP</option>
+<option>SOCKS5</option>
+</select>
+</div>
+<button class="flex items-center gap-2 text-primary font-semibold text-sm hover:bg-primary/5 px-4 py-2 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="lab_testing">labs</span>
+                        Test All
+                    </button>
+</div>
+<!-- Table Content -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 w-10">
+<input class="rounded border-outline-variant bg-surface-container-highest text-primary focus:ring-primary/20" type="checkbox"/>
+</th>
+<th class="px-3 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Status</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Alias</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Protocol</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Host</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Port</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Auth</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Assigned</th>
+<th class="px-4 py-4 text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Last Tested</th>
+<th class="px-6 py-4 text-right text-[0.6875rem] font-bold uppercase tracking-widest text-on-surface-variant">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary" title="Active"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="US Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small United States flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCppuGCirQI91qjvJt1s0q-gre_N7q5Rmomdl9Ko1zRqQYLXxUCUM-GuSkoljfpDt26QrNnGFfCFCxY9Kln0EI6Y-l4-lm23dr1Tgn3Tt8wUnSy4-AF1_FsmJxjJGtIIfAFPExUM8eiQtGyxQVR27NP6IKO71eaO6tdJ4sWjujyURjMwa0cBD4uzT8vum4xLF-UEAicSvq85qRa1TICxIeII4u0DmPNeaItn9FNv7xuIvjmS766orF-9HfikkbCRWNhC6ZpMmr9mOc"/>
+<span class="text-sm font-medium text-white">US-NYC-Static-01</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold">HTTP</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">192.168.1.142</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">8080</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-tertiary text-lg" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">12</span></td>
+<td class="px-4 py-4 text-[10px] text-on-surface-variant font-medium">2 mins ago</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-error glow-error" title="Failed"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="VN Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small Vietnam flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMJfJCsgAuvnrZaX6R811DSpV5VaIKjo5DzHHPKtTQgg-l_7MirahkBXf4VnH5uz9rwE3lFp0GfvApxJXGncE7o4UUDMKX3y9LZVNRBwbnUiP-K8FxaU0G7qAojgrPSlczYWnpkCCLEip-qCES9zEKMxDRd75E7Y52IU3Tj4Cq2NUz1qFUhjvt7ZqpcKDe785X4lvX5I4VXgt74uGLkZOfveFewDlSf7514JIUoLMvgt7zu6Yzk0PREsyRCQ8a2x1nfW-TMQDjsgw"/>
+<span class="text-sm font-medium text-white">VN-HCM-Resi-99</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-secondary-container text-secondary border border-secondary/20 px-1.5 py-0.5 rounded font-bold">SOCKS5</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">103.45.12.8</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">1080</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-on-surface-variant/40 text-lg" data-icon="lock_open">lock_open</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">0</span></td>
+<td class="px-4 py-4 text-[10px] text-error font-medium">Failed (Timeout)</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="DE Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small Germany flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPdO2RCXZgAXBhp7ingLM3CAoX18Fmrm70bWLDYnC7ID-0-YHcFQQ1aBKNB4_lA1Tfg9hUuRjPg9rUwinME5q7545R_-NOhzDAd9mpZUMPpWN2LmAlGZc6FptXtYEkihTh2kSbU-MdnfIuSo4L7EE_xWUsufg2eCr7rnPB9wuNeMor3T625btHI0a1dMoH-6Ek7m12Xx4eO6noLCDzExP4cRleZDRHI3VattS1Le9EE0Okpd9kbft3VxPfoIRGmuyffNf4fVQrZ0s"/>
+<span class="text-sm font-medium text-white">DE-Berlin-Datacenter</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold">HTTP</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">45.22.33.101</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">3128</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-tertiary text-lg" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">4</span></td>
+<td class="px-4 py-4 text-[10px] text-on-surface-variant font-medium">1 hour ago</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="JP Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small Japan flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmxsy2yWUEwyZHMgMxUACHVJyjioxxSuRPDY1qepZVQl5HDY6st4xYzTyccTvsdZNNkBNXEekZGfAXTdGavp7DfQTdbKZrBdAjogCmR5sbSBJRdmxfacAmbV7gPULp-I1u_qcUaBCW5MZhcRRzcaUjmkMCu7Z5Cj3S-ZsbixDwUpoySy64Fhe1iCNx5iv-W6QtBGvuBaS9ROSOOsl-xh-_nU86oU4D-A06uQSVQuq9GAKuUCC5788ot3MYpKLxDB9Cq3WThPjDIec"/>
+<span class="text-sm font-medium text-white">JP-Tokyo-Mobile-04</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-secondary-container text-secondary border border-secondary/20 px-1.5 py-0.5 rounded font-bold">SOCKS5</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">210.5.12.33</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">443</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-tertiary text-lg" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">8</span></td>
+<td class="px-4 py-4 text-[10px] text-on-surface-variant font-medium">Just now</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="UK Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small United Kingdom flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7tYRWPAEWbGjA7h6V7JUmaHcBbuBSmq781VfYYxYM99FIpW40qGo2yMTkZuodhg8iME2Nio5awMZe-fLaTEO4xjkK9QvRri6nNpkyCikBZAMwQrLZJdEDDlcSFX3c194zm-E1SsVJwoeGyR_XksDmPOv88c54d6y4y0rWZY9LXkjGbV-i0x65Zf9wUxnZ3dukXpXsikzPrhKcxSCZ6hqTpHjmr5PkBbA0p_bxWj0I6UFzK_jit3D-FQOabM3zzaD1FSL_DcQlEeI"/>
+<span class="text-sm font-medium text-white">UK-London-Shared</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold">HTTP</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">88.10.99.2</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">80</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-on-surface-variant/40 text-lg" data-icon="lock_open">lock_open</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">2</span></td>
+<td class="px-4 py-4 text-[10px] text-on-surface-variant font-medium">45 mins ago</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-error glow-error"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="US Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small United States flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDs_1FrlgiKHloHJHoWx4ldQ5uhKfkOKRooibpO6UxWjcpWroyBfOavTDC73BcovFkxhSszM_Q7kNn4ztuRZKBTv76sVAzdYBq9_wfM184vUDWUdb9KsnmukarVs_lc9WbjZUOUMuKJnFzmoqAzDPPCJr0J_-qXP4JnNgoe382vqz9st8vCIWBnkjWmEeceao4Tjosb45uKXeVjTk4NUH49EdqLCLiu3s3fUO-TES5-7V4_OhDOF2pEcYMl8_K71ZSBUuWDnPFfVO4"/>
+<span class="text-sm font-medium text-white">US-LA-Residential</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-secondary-container text-secondary border border-secondary/20 px-1.5 py-0.5 rounded font-bold">SOCKS5</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">64.120.44.12</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">5000</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-tertiary text-lg" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">1</span></td>
+<td class="px-4 py-4 text-[10px] text-error font-medium">Auth Error</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 7 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary glow-tertiary"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="VN Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small Vietnam flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBJ_DGixomb4T65Qe2aKJfOQnlNwHrbd11X6RLUV4qcTayP_3ttXa2SF-hB11TM6JFSJd2srzWV4owC1_nve_a-CHJZQek9B7Agn72n92eaG6a2-tAOU2LZ4AWqj3mCd2_eNdTFsxJEFd1_QLICl0flMcLoqu-jGZji7LtczeTA0Gq2K9Yt-9AdB166j4CMWpdqpqpzcb2LgbAPl90YWdeicqHV6kCgzQfxCB4APeRQGUR-x6ObyNlZwOD-4uTQHUiyWx_pi2Mthk"/>
+<span class="text-sm font-medium text-white">VN-DaNang-Static</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded font-bold">HTTP</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">113.161.4.20</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">8888</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-tertiary text-lg" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">5</span></td>
+<td class="px-4 py-4 text-[10px] text-on-surface-variant font-medium">5 mins ago</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 8 -->
+<tr class="group hover:bg-surface-bright transition-colors">
+<td class="px-6 py-4"><input class="rounded border-outline-variant bg-surface-container-highest text-primary" type="checkbox"/></td>
+<td class="px-3 py-4">
+<div class="w-2.5 h-2.5 rounded-full bg-error glow-error"></div>
+</td>
+<td class="px-4 py-4">
+<div class="flex items-center gap-2">
+<img alt="JP Flag" class="w-4 h-3 rounded-sm opacity-80" data-alt="Small Japan flag icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbQ2VBOFupNhuq7lZHLaBW6ijc5iKtj08vD4sxpxsqQatsQ0F24jyDfjXL41HgLESHmTQ2MtwDavPKR8WpUI29nJyWq-ec7_Qc2cwqjj9vAiNRlw4b6VXAVom5FDq4PjLhZLSzEV35NAn7HD_oxRWxdGQmGXpya9RCJBS1VSGPlU4G0vWiPAsH7UM9IRxhnzwyUNj5V_R0TYTj2mGwoZ95v1eze7bJqAnXpjUAUuIQnKt9bEr7XlrtaSBI5e66CrSW-FAnK5LN3tg"/>
+<span class="text-sm font-medium text-white">JP-Osaka-Test</span>
+</div>
+</td>
+<td class="px-4 py-4"><span class="text-[10px] bg-secondary-container text-secondary border border-secondary/20 px-1.5 py-0.5 rounded font-bold">SOCKS5</span></td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">123.45.67.89</td>
+<td class="px-4 py-4 font-mono text-xs text-on-surface-variant">9050</td>
+<td class="px-4 py-4"><span class="material-symbols-outlined text-on-surface-variant/40 text-lg" data-icon="lock_open">lock_open</span></td>
+<td class="px-4 py-4"><span class="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] font-bold text-primary">0</span></td>
+<td class="px-4 py-4 text-[10px] text-error font-medium">Inactive</td>
+<td class="px-6 py-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="play_circle">play_circle</span></button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-highest rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="edit">edit</span></button>
+<button class="p-1.5 text-error hover:bg-error/10 rounded-md transition-colors"><span class="material-symbols-outlined text-lg" data-icon="delete">delete</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer Pagination-like state -->
+<div class="p-4 bg-surface-container flex items-center justify-between text-[0.6875rem] font-semibold tracking-widest text-on-surface-variant uppercase">
+<span>Showing 8 of 54 proxies</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 bg-surface-container-highest rounded opacity-50 cursor-not-allowed">Prev</button>
+<button class="px-3 py-1 bg-surface-container-highest rounded hover:bg-primary hover:text-on-primary-fixed transition-colors">Next</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Global Footer -->
+<footer class="bg-transparent text-[#aaabb0] font-['Inter'] text-[0.6875rem] font-semibold uppercase tracking-wider fixed bottom-4 right-6 flex gap-4 items-center justify-end z-50">
+<span class="opacity-50">Anti-Detech © 2026</span>
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">Docs</a>
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">API</a>
+<a class="hover:text-[#81ecff] underline-offset-4 transition-opacity opacity-80 hover:opacity-100" href="#">Support</a>
+</footer>
+</body></html>
