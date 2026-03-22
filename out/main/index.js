@@ -7,6 +7,7 @@ const https = require("https");
 const crypto = require("crypto");
 const child_process = require("child_process");
 const proxyChain = require("proxy-chain");
+const os = require("os");
 const is = {
   dev: !electron.app.isPackaged
 };
@@ -240,7 +241,7 @@ function createDownloadDir() {
   }
   return dir;
 }
-function downloadFile(url, outputPath) {
+function downloadFile$1(url, outputPath) {
   return new Promise((resolve, reject) => {
     const request = https.get(url, (response) => {
       const statusCode = response.statusCode ?? 0;
@@ -251,7 +252,7 @@ function downloadFile(url, outputPath) {
           reject(new Error("Chromium download redirected without a location header."));
           return;
         }
-        downloadFile(redirect, outputPath).then(resolve).catch(reject);
+        downloadFile$1(redirect, outputPath).then(resolve).catch(reject);
         return;
       }
       if (statusCode < 200 || statusCode >= 300) {
@@ -356,7 +357,7 @@ async function downloadChromium(downloadUrl, expectedSha256) {
   const urlObject = new URL(downloadUrl);
   const fileName = path.basename(urlObject.pathname) || "chromium-download";
   const downloadedPath = path.join(downloadDir, fileName);
-  await downloadFile(downloadUrl, downloadedPath);
+  await downloadFile$1(downloadUrl, downloadedPath);
   if (expectedSha256) {
     const actual = calculateSha256(downloadedPath);
     if (actual.toLowerCase() !== expectedSha256.toLowerCase()) {
@@ -410,8 +411,23 @@ const IPC_CHANNELS = {
   PROFILES_BULK_OPEN: "profiles:bulkOpen",
   PROFILES_BULK_CLOSE: "profiles:bulkClose",
   PROFILES_BULK_PROXY_ASSIGN: "profiles:bulkProxyAssign",
+  PROFILES_BULK_PROXY_ASSIGN_MAP: "profiles:bulkProxyAssignMap",
   PROFILES_IMPORT_ZIP: "profiles:importZip",
   PROFILES_EXPORT_ZIP: "profiles:exportZip",
+  PROFILES_OPEN_FOLDER: "profiles:openFolder",
+  COOKIES_READ: "cookies:read",
+  COOKIES_WRITE: "cookies:write",
+  COOKIES_CLEAR: "cookies:clear",
+  BOOKMARKS_LIST: "bookmarks:list",
+  BOOKMARKS_ADD: "bookmarks:add",
+  BOOKMARKS_DELETE: "bookmarks:delete",
+  BOOKMARKS_IMPORT_JSON: "bookmarks:importJson",
+  EXTENSIONS_LIST: "extensions:list",
+  EXTENSIONS_INSTALL_UNPACKED: "extensions:installUnpacked",
+  EXTENSIONS_INSTALL_CRX: "extensions:installCrx",
+  EXTENSIONS_INSTALL_WEBSTORE: "extensions:installWebstore",
+  EXTENSIONS_REMOVE: "extensions:remove",
+  EXTENSIONS_TOGGLE: "extensions:toggle",
   PROXIES_GET_ALL: "proxies:getAll",
   PROXIES_CREATE: "proxies:create",
   PROXIES_UPDATE: "proxies:update",
@@ -477,7 +493,7 @@ class ProfileRepository {
           SELECT id, name, group_id, note, proxy_id, ${this.hasFingerprintSeedColumn ? "fingerprint_seed," : ""} user_agent, timezone,
                  ${this.hasTagsColumn ? "tags," : ""} is_pinned, last_opened, created_at
           FROM profiles
-          ORDER BY datetime(created_at) DESC
+          ORDER BY is_pinned DESC, datetime(created_at) DESC
         `
     ).all();
     return rows.map((row) => this.toProfile(row));
@@ -862,6 +878,10 @@ function setProfileProcess(profileId, child) {
 function getProfileProcess(profileId) {
   return processMap.get(profileId);
 }
+function hasRunningProfileProcess(profileId) {
+  const child = processMap.get(profileId);
+  return Boolean(child && child.exitCode === null && !child.killed);
+}
 function removeProfileProcess(profileId) {
   processMap.delete(profileId);
 }
@@ -876,6 +896,238 @@ function broadcastProfileError(profileId, message) {
     status: "error",
     error: message
   });
+}
+function toExtension(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    extensionName: row.extension_name,
+    extensionPath: row.extension_path,
+    source: row.source,
+    sourceRef: row.source_ref ?? void 0,
+    enabled: Boolean(row.enabled),
+    createdAt: row.created_at
+  };
+}
+class ExtensionRepository {
+  list(profileId) {
+    return getDb().prepare(
+      `
+          SELECT id, profile_id, extension_name, extension_path, source, source_ref, enabled, created_at
+          FROM profile_extensions
+          WHERE profile_id = ?
+          ORDER BY datetime(created_at) DESC
+        `
+    ).all(profileId).map((row) => toExtension(row));
+  }
+  listEnabled(profileId) {
+    return getDb().prepare(
+      `
+          SELECT id, profile_id, extension_name, extension_path, source, source_ref, enabled, created_at
+          FROM profile_extensions
+          WHERE profile_id = ? AND enabled = 1
+          ORDER BY datetime(created_at) DESC
+        `
+    ).all(profileId).map((row) => toExtension(row));
+  }
+  add(profileId, data) {
+    const id = crypto.randomUUID();
+    getDb().prepare(
+      `
+          INSERT INTO profile_extensions (id, profile_id, extension_name, extension_path, source, source_ref, enabled)
+          VALUES (?, ?, ?, ?, ?, ?, 1)
+        `
+    ).run(id, profileId, data.extensionName, data.extensionPath, data.source, data.sourceRef ?? null);
+    const created = this.getById(profileId, id);
+    if (!created) {
+      throw new Error("Failed to create extension record.");
+    }
+    return created;
+  }
+  toggle(profileId, extensionId, enabled) {
+    getDb().prepare("UPDATE profile_extensions SET enabled = ? WHERE id = ? AND profile_id = ?").run(enabled ? 1 : 0, extensionId, profileId);
+  }
+  delete(profileId, extensionId) {
+    getDb().prepare("DELETE FROM profile_extensions WHERE id = ? AND profile_id = ?").run(extensionId, profileId);
+  }
+  getById(profileId, extensionId) {
+    const row = getDb().prepare(
+      `
+          SELECT id, profile_id, extension_name, extension_path, source, source_ref, enabled, created_at
+          FROM profile_extensions
+          WHERE id = ? AND profile_id = ?
+        `
+    ).get(extensionId, profileId);
+    return row ? toExtension(row) : null;
+  }
+}
+const AdmZip = require("adm-zip");
+const profileRepo$5 = new ProfileRepository();
+const extensionRepo = new ExtensionRepository();
+function ensureProfile(profileId) {
+  const profile = profileRepo$5.getById(profileId);
+  if (!profile) {
+    throw new Error(`Profile not found: ${profileId}`);
+  }
+}
+function ensureNotRunning$1(profileId) {
+  if (hasRunningProfileProcess(profileId)) {
+    throw new Error("Profile is currently running. Please stop it before changing extensions.");
+  }
+}
+function extensionBaseDir(profileId) {
+  const dir = path.join(electron.app.getPath("userData"), "profiles", profileId, "extensions");
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+function sanitizeName(name) {
+  return name.replace(/[^a-zA-Z0-9-_]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || crypto.randomUUID();
+}
+function parseWebstoreExtensionId(url) {
+  const match = url.match(/\/detail\/[a-zA-Z0-9-_]+\/([a-p]{32})/);
+  return match?.[1] ?? null;
+}
+function downloadFile(url, outputPath) {
+  return new Promise((resolve, reject) => {
+    const output = fs.createWriteStream(outputPath);
+    const request = https.get(url, (response) => {
+      if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        output.close();
+        fs.unlinkSync(outputPath);
+        void downloadFile(response.headers.location, outputPath).then(resolve).catch(reject);
+        return;
+      }
+      if (!response.statusCode || response.statusCode >= 400) {
+        reject(new Error(`Failed to download file: HTTP ${response.statusCode ?? "unknown"}`));
+        return;
+      }
+      response.pipe(output);
+      output.on("finish", () => {
+        output.close();
+        resolve();
+      });
+    });
+    request.on("error", (error) => {
+      output.close();
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+      reject(error);
+    });
+  });
+}
+function extractCrxToDirectory(crxPath, targetDir) {
+  const buffer = fs.readFileSync(crxPath);
+  const zipHeader = Buffer.from([80, 75, 3, 4]);
+  const zipOffset = buffer.indexOf(zipHeader);
+  if (zipOffset < 0) {
+    throw new Error("Invalid CRX file: ZIP payload not found.");
+  }
+  const zipBuffer = buffer.subarray(zipOffset);
+  const zip = new AdmZip(zipBuffer);
+  zip.extractAllTo(targetDir, true);
+}
+function resolveExtensionName(unpackedDir) {
+  const manifestPath = path.join(unpackedDir, "manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    return path.basename(unpackedDir);
+  }
+  try {
+    const raw = fs.readFileSync(manifestPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed.name?.trim() || path.basename(unpackedDir);
+  } catch {
+    return path.basename(unpackedDir);
+  }
+}
+function listProfileExtensions(profileId) {
+  ensureProfile(profileId);
+  return extensionRepo.list(profileId);
+}
+function listEnabledExtensionPaths(profileId) {
+  return extensionRepo.listEnabled(profileId).map((record) => record.extensionPath).filter((extensionPath) => fs.existsSync(extensionPath));
+}
+function installExtensionFromUnpacked(profileId, directoryPath) {
+  ensureProfile(profileId);
+  ensureNotRunning$1(profileId);
+  const sourceDir = directoryPath.trim();
+  if (!sourceDir || !fs.existsSync(sourceDir)) {
+    throw new Error("Unpacked extension directory does not exist.");
+  }
+  const name = resolveExtensionName(sourceDir);
+  const targetDir = path.join(extensionBaseDir(profileId), `${sanitizeName(name)}_${Date.now()}`);
+  fs.cpSync(sourceDir, targetDir, { recursive: true });
+  extensionRepo.add(profileId, {
+    extensionName: name,
+    extensionPath: targetDir,
+    source: "unpacked",
+    sourceRef: sourceDir
+  });
+}
+function installExtensionFromCrx(profileId, crxPath) {
+  ensureProfile(profileId);
+  ensureNotRunning$1(profileId);
+  const sourceCrxPath = crxPath.trim();
+  if (!sourceCrxPath || !fs.existsSync(sourceCrxPath)) {
+    throw new Error("CRX file does not exist.");
+  }
+  const extensionName = sanitizeName(path.basename(sourceCrxPath, path.extname(sourceCrxPath)));
+  const targetDir = path.join(extensionBaseDir(profileId), `${extensionName}_${Date.now()}`);
+  fs.mkdirSync(targetDir, { recursive: true });
+  extractCrxToDirectory(sourceCrxPath, targetDir);
+  const resolvedName = resolveExtensionName(targetDir);
+  extensionRepo.add(profileId, {
+    extensionName: resolvedName,
+    extensionPath: targetDir,
+    source: "crx",
+    sourceRef: sourceCrxPath
+  });
+}
+async function installExtensionFromWebstore(profileId, webstoreUrl) {
+  ensureProfile(profileId);
+  ensureNotRunning$1(profileId);
+  const extensionId = parseWebstoreExtensionId(webstoreUrl.trim());
+  if (!extensionId) {
+    throw new Error("Invalid Chrome Web Store URL. Cannot extract extension id.");
+  }
+  const downloadUrl = `https://clients2.google.com/service/update2/crx?response=redirect&prodversion=122.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+  const tmpCrxPath = path.join(os.tmpdir(), `${extensionId}_${Date.now()}.crx`);
+  try {
+    await downloadFile(downloadUrl, tmpCrxPath);
+    const targetDir = path.join(extensionBaseDir(profileId), `${extensionId}_${Date.now()}`);
+    fs.mkdirSync(targetDir, { recursive: true });
+    extractCrxToDirectory(tmpCrxPath, targetDir);
+    const extensionName = resolveExtensionName(targetDir);
+    extensionRepo.add(profileId, {
+      extensionName,
+      extensionPath: targetDir,
+      source: "webstore",
+      sourceRef: webstoreUrl.trim()
+    });
+  } finally {
+    if (fs.existsSync(tmpCrxPath)) {
+      fs.unlinkSync(tmpCrxPath);
+    }
+  }
+}
+function removeProfileExtension(profileId, extensionId) {
+  ensureProfile(profileId);
+  ensureNotRunning$1(profileId);
+  const existing = extensionRepo.list(profileId).find((item) => item.id === extensionId);
+  if (!existing) {
+    throw new Error("Extension not found.");
+  }
+  extensionRepo.delete(profileId, extensionId);
+  if (fs.existsSync(existing.extensionPath)) {
+    fs.rmSync(existing.extensionPath, { recursive: true, force: true });
+  }
+}
+function toggleProfileExtension(profileId, extensionId, enabled) {
+  ensureProfile(profileId);
+  ensureNotRunning$1(profileId);
+  extensionRepo.toggle(profileId, extensionId, enabled);
 }
 const proxyRepository = new ProxyRepository();
 function profileUserDataDir(profileId) {
@@ -899,10 +1151,16 @@ function buildChromiumArgs(profile, proxyServerUrl) {
     "--no-first-run",
     "--no-default-browser-check",
     "--new-window",
-    "about:blank"
+    "https://google.com"
   ];
   if (proxyServerUrl) {
     args.splice(1, 0, `--proxy-server=${proxyServerUrl}`);
+  }
+  const extensionPaths = listEnabledExtensionPaths(profile.id);
+  if (extensionPaths.length > 0) {
+    const joined = extensionPaths.join(",");
+    args.splice(1, 0, `--disable-extensions-except=${joined}`);
+    args.splice(2, 0, `--load-extension=${joined}`);
   }
   return args;
 }
@@ -983,25 +1241,85 @@ async function stopProfiles(profileIds) {
   }
   return errors.length > 0 ? { success: false, errors } : { success: true };
 }
-const profileRepo$1 = new ProfileRepository();
+const profileRepo$4 = new ProfileRepository();
+function safeReadJson(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return {};
+  }
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+function writeJson(filePath, payload) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+}
+function syncBrowserProfileName(profileId, profileName) {
+  const userDataDir = path.join(electron.app.getPath("userData"), "profiles", profileId, "user-data");
+  const localStatePath = path.join(userDataDir, "Local State");
+  const preferencesPath = path.join(userDataDir, "Default", "Preferences");
+  const localState = safeReadJson(localStatePath);
+  const profileObject = localState.profile && typeof localState.profile === "object" && !Array.isArray(localState.profile) ? localState.profile : {};
+  const infoCache = profileObject.info_cache && typeof profileObject.info_cache === "object" && !Array.isArray(profileObject.info_cache) ? profileObject.info_cache : {};
+  const defaultInfo = infoCache.Default && typeof infoCache.Default === "object" && !Array.isArray(infoCache.Default) ? infoCache.Default : {};
+  defaultInfo.name = profileName;
+  infoCache.Default = defaultInfo;
+  profileObject.info_cache = infoCache;
+  localState.profile = profileObject;
+  writeJson(localStatePath, localState);
+  const preferences = safeReadJson(preferencesPath);
+  const preferencesProfile = preferences.profile && typeof preferences.profile === "object" && !Array.isArray(preferences.profile) ? preferences.profile : {};
+  preferencesProfile.name = profileName;
+  preferences.profile = preferencesProfile;
+  writeJson(preferencesPath, preferences);
+}
 function setupProfileHandlers() {
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_GET_ALL, async () => {
-    return profileRepo$1.list();
+    return profileRepo$4.list();
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_CREATE, async (_event, data) => {
-    return profileRepo$1.create(data);
+    return profileRepo$4.create(data);
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_UPDATE, async (_event, id, data) => {
-    return profileRepo$1.update(id, data);
+    const updated = profileRepo$4.update(id, data);
+    if (typeof data.name === "string" && data.name.trim()) {
+      syncBrowserProfileName(id, data.name.trim());
+    }
+    return updated;
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_DELETE, async (_event, id) => {
-    profileRepo$1.delete(id);
+    profileRepo$4.delete(id);
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_START, async (_event, profileIds) => {
-    return launchProfiles(profileIds, profileRepo$1);
+    return launchProfiles(profileIds, profileRepo$4);
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_STOP, async (_event, profileIds) => {
     return stopProfiles(profileIds);
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.PROFILES_OPEN_FOLDER, async (_event, profileId) => {
+    const profile = profileRepo$4.getById(profileId);
+    if (!profile) {
+      return { success: false, error: `Profile not found: ${profileId}` };
+    }
+    const folderPath = path.join(electron.app.getPath("userData"), "profiles", profileId);
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+    const openError = await electron.shell.openPath(folderPath);
+    if (openError) {
+      return { success: false, error: openError };
+    }
+    return { success: true };
   });
 }
 const proxyRepo = new ProxyRepository();
@@ -1120,12 +1438,12 @@ async function runWithConcurrency(items, worker, concurrency = 3) {
   await Promise.all(workers);
   return results;
 }
-const profileRepo = new ProfileRepository();
+const profileRepo$3 = new ProfileRepository();
 async function bulkOpen(profileIds) {
   const results = await runWithConcurrency(
     profileIds,
     async (profileId) => {
-      const openResult = await launchProfiles([profileId], profileRepo);
+      const openResult = await launchProfiles([profileId], profileRepo$3);
       if (!openResult.success) {
         throw new Error(openResult.errors?.join(", ") ?? `Failed to launch ${profileId}`);
       }
@@ -1142,7 +1460,19 @@ async function bulkAssignProxy(profileIds, proxyId) {
   const errors = [];
   for (const profileId of profileIds) {
     try {
-      profileRepo.update(profileId, { proxyId });
+      profileRepo$3.update(profileId, { proxyId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${profileId}: ${message}`);
+    }
+  }
+  return errors.length > 0 ? { success: false, errors } : { success: true };
+}
+async function bulkAssignProxyMap(profileProxyMap) {
+  const errors = [];
+  for (const [profileId, proxyId] of Object.entries(profileProxyMap)) {
+    try {
+      profileRepo$3.update(profileId, { proxyId });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`${profileId}: ${message}`);
@@ -1160,6 +1490,9 @@ function setupBulkHandlers() {
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, async (_event, profileIds, proxyId) => {
     return bulkAssignProxy(profileIds, proxyId);
   });
+  electron.ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN_MAP, async (_event, profileProxyMap) => {
+    return bulkAssignProxyMap(profileProxyMap);
+  });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_UPDATE, async (_event, profileIds, updates) => {
     if (Object.prototype.hasOwnProperty.call(updates, "proxyId")) {
       return bulkAssignProxy(profileIds, updates.proxyId);
@@ -1167,17 +1500,600 @@ function setupBulkHandlers() {
     return { success: true };
   });
 }
+const profileRepo$2 = new ProfileRepository();
+const CHROMIUM_UNIX_EPOCH_OFFSET_SECONDS = 11644473600;
+function getCookieFilePath(profileId, format) {
+  const cookieDir = path.join(electron.app.getPath("userData"), "profiles", profileId, "cookies");
+  if (!fs.existsSync(cookieDir)) {
+    fs.mkdirSync(cookieDir, { recursive: true });
+  }
+  const fileName = format === "json" ? "cookies.json" : "cookies.txt";
+  return path.join(cookieDir, fileName);
+}
+function getProfileUserDataDir(profileId) {
+  return path.join(electron.app.getPath("userData"), "profiles", profileId, "user-data");
+}
+function getChromiumCookieDbPath(profileId) {
+  const userDataDir = getProfileUserDataDir(profileId);
+  const candidates = [
+    path.join(userDataDir, "Default", "Network", "Cookies"),
+    path.join(userDataDir, "Default", "Cookies")
+  ];
+  const existing = candidates.find((candidate) => fs.existsSync(candidate));
+  return existing ?? candidates[0];
+}
+function toChromiumTimestamp(unixSeconds) {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) {
+    return 0;
+  }
+  return Math.trunc((unixSeconds + CHROMIUM_UNIX_EPOCH_OFFSET_SECONDS) * 1e6);
+}
+function fromChromiumTimestamp(chromiumMicroseconds) {
+  if (!chromiumMicroseconds || !Number.isFinite(chromiumMicroseconds) || chromiumMicroseconds <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(chromiumMicroseconds / 1e6 - CHROMIUM_UNIX_EPOCH_OFFSET_SECONDS));
+}
+function toChromiumSameSite(sameSite) {
+  if (sameSite === "None") return 1;
+  if (sameSite === "Lax") return 2;
+  if (sameSite === "Strict") return 3;
+  return 0;
+}
+function fromChromiumSameSite(sameSite) {
+  if (sameSite === 1) return "None";
+  if (sameSite === 2) return "Lax";
+  if (sameSite === 3) return "Strict";
+  return void 0;
+}
+function withCookieDb(profileId, run) {
+  const dbPath = getChromiumCookieDbPath(profileId);
+  if (!fs.existsSync(dbPath)) {
+    return null;
+  }
+  const db2 = new Database(dbPath);
+  try {
+    return run(db2);
+  } finally {
+    db2.close();
+  }
+}
+function getCookiesTableColumns(db2) {
+  const rows = db2.prepare("PRAGMA table_info(cookies)").all();
+  return new Set(rows.map((row) => row.name));
+}
+function readCookiesFromChromiumDb(profileId) {
+  return withCookieDb(profileId, (db2) => {
+    const tables = db2.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'").all();
+    if (tables.length === 0) {
+      return [];
+    }
+    const rows = db2.prepare(
+      `
+          SELECT host_key, name, value, path, expires_utc, is_secure, is_httponly, samesite
+          FROM cookies
+          ORDER BY host_key ASC, name ASC
+        `
+    ).all();
+    return rows.map(
+      (row) => normalizeCookie({
+        domain: row.host_key,
+        name: row.name,
+        value: row.value ?? "",
+        path: row.path ?? "/",
+        expires: fromChromiumTimestamp(row.expires_utc),
+        secure: Boolean(row.is_secure),
+        httpOnly: Boolean(row.is_httponly),
+        sameSite: fromChromiumSameSite(row.samesite)
+      })
+    ).filter((cookie) => cookie.domain && cookie.name);
+  });
+}
+function writeCookiesToChromiumDb(profileId, cookies) {
+  const result = withCookieDb(profileId, (db2) => {
+    const tableExists = db2.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'").get();
+    if (!tableExists) {
+      return false;
+    }
+    const columns = getCookiesTableColumns(db2);
+    const nowChromium = toChromiumTimestamp(Math.trunc(Date.now() / 1e3));
+    const apply = db2.transaction((items) => {
+      const deleteStatement = db2.prepare("DELETE FROM cookies WHERE host_key = ? AND name = ? AND path = ?");
+      for (const cookie of items) {
+        deleteStatement.run(cookie.domain, cookie.name, cookie.path || "/");
+        const valuesByColumn = {
+          creation_utc: nowChromium,
+          host_key: cookie.domain,
+          name: cookie.name,
+          value: cookie.value,
+          path: cookie.path || "/",
+          expires_utc: toChromiumTimestamp(cookie.expires),
+          is_secure: cookie.secure ? 1 : 0,
+          is_httponly: cookie.httpOnly ? 1 : 0,
+          last_access_utc: nowChromium,
+          has_expires: cookie.expires > 0 ? 1 : 0,
+          is_persistent: cookie.expires > 0 ? 1 : 0,
+          priority: 1,
+          samesite: toChromiumSameSite(cookie.sameSite),
+          source_scheme: cookie.secure ? 2 : 1,
+          source_port: 443,
+          last_update_utc: nowChromium,
+          source_type: 0,
+          is_same_party: 0,
+          same_party_context: 0
+        };
+        const insertColumns = Object.keys(valuesByColumn).filter((column) => columns.has(column));
+        const placeholders = insertColumns.map(() => "?").join(", ");
+        const insertSql = `INSERT INTO cookies (${insertColumns.join(", ")}) VALUES (${placeholders})`;
+        const insertValues = insertColumns.map((column) => valuesByColumn[column]);
+        db2.prepare(insertSql).run(...insertValues);
+      }
+    });
+    apply(cookies);
+    return true;
+  });
+  return Boolean(result);
+}
+function clearCookiesFromChromiumDb(profileId) {
+  const result = withCookieDb(profileId, (db2) => {
+    const tableExists = db2.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'").get();
+    if (!tableExists) {
+      return false;
+    }
+    db2.prepare("DELETE FROM cookies").run();
+    return true;
+  });
+  return Boolean(result);
+}
+function normalizeCookie(input) {
+  return {
+    domain: String(input.domain ?? ""),
+    name: String(input.name ?? ""),
+    value: String(input.value ?? ""),
+    path: String(input.path ?? "/"),
+    expires: Number.isFinite(input.expires) ? Number(input.expires) : 0,
+    secure: Boolean(input.secure),
+    httpOnly: Boolean(input.httpOnly),
+    sameSite: input.sameSite === "Strict" || input.sameSite === "Lax" || input.sameSite === "None" ? input.sameSite : void 0
+  };
+}
+function parseJsonCookies(content) {
+  const parsed = JSON.parse(content);
+  if (!Array.isArray(parsed)) {
+    throw new Error("JSON cookies must be an array.");
+  }
+  return parsed.map((entry) => normalizeCookie(entry ?? {})).filter((cookie) => cookie.domain && cookie.name);
+}
+function parseNetscapeCookies(content) {
+  const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+  const cookies = [];
+  for (const line of lines) {
+    const parts = line.split("	");
+    if (parts.length < 7) {
+      continue;
+    }
+    const [domain, , cookiePath, secure, expires, name, ...valueParts] = parts;
+    cookies.push(
+      normalizeCookie({
+        domain,
+        path: cookiePath || "/",
+        secure: secure.toUpperCase() === "TRUE",
+        expires: Number.parseInt(expires, 10) || 0,
+        name,
+        value: valueParts.join("	")
+      })
+    );
+  }
+  return cookies.filter((cookie) => cookie.domain && cookie.name);
+}
+function serializeJsonCookies(cookies) {
+  return JSON.stringify(cookies, null, 2);
+}
+function serializeNetscapeCookies(cookies) {
+  const header = "# Netscape HTTP Cookie File\n# This file was generated by Multi-Profile Browser Manager\n";
+  const lines = cookies.map((cookie) => {
+    const includeSubdomains = cookie.domain.startsWith(".") ? "TRUE" : "FALSE";
+    const secure = cookie.secure ? "TRUE" : "FALSE";
+    return [
+      cookie.domain,
+      includeSubdomains,
+      cookie.path || "/",
+      secure,
+      String(cookie.expires || 0),
+      cookie.name,
+      cookie.value
+    ].join("	");
+  });
+  return `${header}${lines.join("\n")}
+`;
+}
+function parseCookies(content, format) {
+  if (!content.trim()) {
+    return [];
+  }
+  return format === "json" ? parseJsonCookies(content) : parseNetscapeCookies(content);
+}
+function serializeCookies(cookies, format) {
+  return format === "json" ? serializeJsonCookies(cookies) : serializeNetscapeCookies(cookies);
+}
+function ensureProfileExists(profileId) {
+  const profile = profileRepo$2.getById(profileId);
+  if (!profile) {
+    throw new Error(`Profile not found: ${profileId}`);
+  }
+}
+function setupCookieHandlers() {
+  electron.ipcMain.handle(IPC_CHANNELS.COOKIES_READ, async (_event, profileId, format) => {
+    try {
+      ensureProfileExists(profileId);
+      const chromiumCookies = readCookiesFromChromiumDb(profileId);
+      if (chromiumCookies) {
+        return {
+          success: true,
+          format,
+          cookies: chromiumCookies,
+          content: serializeCookies(chromiumCookies, format)
+        };
+      }
+      const filePath = getCookieFilePath(profileId, format);
+      if (!fs.existsSync(filePath)) {
+        return { success: true, format, cookies: [], content: "" };
+      }
+      const content = fs.readFileSync(filePath, "utf8");
+      const cookies = parseCookies(content, format);
+      return { success: true, format, cookies, content };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, format, cookies: [], content: "", error: message };
+    }
+  });
+  electron.ipcMain.handle(
+    IPC_CHANNELS.COOKIES_WRITE,
+    async (_event, profileId, format, content) => {
+      try {
+        ensureProfileExists(profileId);
+        const cookies = parseCookies(content, format);
+        const serialized = serializeCookies(cookies, format);
+        const filePath = getCookieFilePath(profileId, format);
+        fs.writeFileSync(filePath, serialized, "utf8");
+        writeCookiesToChromiumDb(profileId, cookies);
+        return { success: true, count: cookies.length };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, count: 0, error: message };
+      }
+    }
+  );
+  electron.ipcMain.handle(IPC_CHANNELS.COOKIES_CLEAR, async (_event, profileId) => {
+    try {
+      ensureProfileExists(profileId);
+      for (const format of ["json", "netscape"]) {
+        const filePath = getCookieFilePath(profileId, format);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      clearCookiesFromChromiumDb(profileId);
+      return { success: true, count: 0 };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, count: 0, error: message };
+    }
+  });
+}
+function toBookmark(row) {
+  return {
+    id: row.id,
+    profileId: row.profile_id,
+    title: row.title,
+    url: row.url,
+    folder: row.folder ?? void 0,
+    createdAt: row.created_at
+  };
+}
+function chromiumTimestamp() {
+  const epoch = Date.UTC(1601, 0, 1);
+  const now = Date.now();
+  return String((now - epoch) * 1e3);
+}
+function profileBookmarksFile(profileId) {
+  const filePath = path.join(electron.app.getPath("userData"), "profiles", profileId, "user-data", "Default", "Bookmarks");
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return filePath;
+}
+function ensureNotRunning(profileId) {
+  if (hasRunningProfileProcess(profileId)) {
+    throw new Error("Profile is currently running. Please restart profile after closing browser before modifying bookmarks.");
+  }
+}
+class BookmarkRepository {
+  profileRepo = new ProfileRepository();
+  list(profileId) {
+    return getDb().prepare(
+      `
+          SELECT id, profile_id, title, url, folder, created_at
+          FROM profile_bookmarks
+          WHERE profile_id = ?
+          ORDER BY datetime(created_at) DESC
+        `
+    ).all(profileId).map((row) => toBookmark(row));
+  }
+  add(profileId, data) {
+    this.ensureProfile(profileId);
+    ensureNotRunning(profileId);
+    const normalizedTitle = data.title.trim();
+    const normalizedUrl = data.url.trim();
+    if (!normalizedTitle) throw new Error("Bookmark title is required.");
+    if (!/^https?:\/\//i.test(normalizedUrl)) throw new Error("Bookmark URL must start with http:// or https://");
+    const id = crypto.randomUUID();
+    getDb().prepare(
+      `
+          INSERT INTO profile_bookmarks (id, profile_id, title, url, folder)
+          VALUES (?, ?, ?, ?, ?)
+        `
+    ).run(id, profileId, normalizedTitle, normalizedUrl, data.folder?.trim() || null);
+    this.syncChromiumBookmarks(profileId);
+    const created = this.getById(profileId, id);
+    if (!created) {
+      throw new Error("Failed to create bookmark.");
+    }
+    return created;
+  }
+  delete(profileId, bookmarkId) {
+    this.ensureProfile(profileId);
+    ensureNotRunning(profileId);
+    getDb().prepare("DELETE FROM profile_bookmarks WHERE id = ? AND profile_id = ?").run(bookmarkId, profileId);
+    this.syncChromiumBookmarks(profileId);
+  }
+  importJson(profileId, jsonContent) {
+    this.ensureProfile(profileId);
+    ensureNotRunning(profileId);
+    const parsed = JSON.parse(jsonContent);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Bookmark import JSON must be an array.");
+    }
+    const insert = getDb().prepare(
+      "INSERT INTO profile_bookmarks (id, profile_id, title, url, folder) VALUES (?, ?, ?, ?, ?)"
+    );
+    const insertMany = getDb().transaction((items) => {
+      for (const item of items) {
+        const title = item.title?.trim();
+        const url = item.url?.trim();
+        if (!title || !url || !/^https?:\/\//i.test(url)) {
+          continue;
+        }
+        insert.run(crypto.randomUUID(), profileId, title, url, item.folder?.trim() || null);
+      }
+    });
+    const normalized = parsed.map((item) => item).filter((item) => typeof item.title === "string" && typeof item.url === "string").map((item) => ({ title: item.title, url: item.url, folder: item.folder }));
+    insertMany(normalized);
+    this.syncChromiumBookmarks(profileId);
+    return normalized.length;
+  }
+  getById(profileId, bookmarkId) {
+    const row = getDb().prepare(
+      `
+          SELECT id, profile_id, title, url, folder, created_at
+          FROM profile_bookmarks
+          WHERE id = ? AND profile_id = ?
+        `
+    ).get(bookmarkId, profileId);
+    return row ? toBookmark(row) : null;
+  }
+  ensureProfile(profileId) {
+    const profile = this.profileRepo.getById(profileId);
+    if (!profile) {
+      throw new Error(`Profile not found: ${profileId}`);
+    }
+  }
+  syncChromiumBookmarks(profileId) {
+    const filePath = profileBookmarksFile(profileId);
+    const bookmarks = this.list(profileId).reverse();
+    const children = bookmarks.map((bookmark, index) => ({
+      id: String(index + 1),
+      name: bookmark.title,
+      type: "url",
+      url: bookmark.url,
+      date_added: chromiumTimestamp(),
+      date_last_used: "0"
+    }));
+    const payload = {
+      checksum: "",
+      roots: {
+        bookmark_bar: {
+          children,
+          date_added: chromiumTimestamp(),
+          date_modified: chromiumTimestamp(),
+          id: "1",
+          name: "Bookmarks Bar",
+          type: "folder"
+        },
+        other: {
+          children: [],
+          date_added: chromiumTimestamp(),
+          date_modified: chromiumTimestamp(),
+          id: "2",
+          name: "Other Bookmarks",
+          type: "folder"
+        },
+        synced: {
+          children: [],
+          date_added: chromiumTimestamp(),
+          date_modified: chromiumTimestamp(),
+          id: "3",
+          name: "Mobile Bookmarks",
+          type: "folder"
+        }
+      },
+      version: 1
+    };
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf8");
+  }
+}
+const bookmarkRepo = new BookmarkRepository();
+function setupBookmarkHandlers() {
+  electron.ipcMain.handle(IPC_CHANNELS.BOOKMARKS_LIST, async (_event, profileId) => {
+    return bookmarkRepo.list(profileId);
+  });
+  electron.ipcMain.handle(
+    IPC_CHANNELS.BOOKMARKS_ADD,
+    async (_event, profileId, bookmark) => {
+      try {
+        bookmarkRepo.add(profileId, bookmark);
+        return { success: true, count: 1 };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, count: 0, error: message };
+      }
+    }
+  );
+  electron.ipcMain.handle(IPC_CHANNELS.BOOKMARKS_DELETE, async (_event, profileId, bookmarkId) => {
+    try {
+      bookmarkRepo.delete(profileId, bookmarkId);
+      return { success: true, count: 1 };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, count: 0, error: message };
+    }
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.BOOKMARKS_IMPORT_JSON, async (_event, profileId, jsonContent) => {
+    try {
+      const count = bookmarkRepo.importJson(profileId, jsonContent);
+      return { success: true, count };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, count: 0, error: message };
+    }
+  });
+}
+function setupExtensionHandlers() {
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_LIST, async (_event, profileId) => {
+    return listProfileExtensions(profileId);
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_INSTALL_UNPACKED, async (_event, profileId, directoryPath) => {
+    try {
+      installExtensionFromUnpacked(profileId, directoryPath);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_INSTALL_CRX, async (_event, profileId, crxPath) => {
+    try {
+      installExtensionFromCrx(profileId, crxPath);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_INSTALL_WEBSTORE, async (_event, profileId, webstoreUrl) => {
+    try {
+      await installExtensionFromWebstore(profileId, webstoreUrl);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_REMOVE, async (_event, profileId, extensionId) => {
+    try {
+      removeProfileExtension(profileId, extensionId);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+  electron.ipcMain.handle(IPC_CHANNELS.EXTENSIONS_TOGGLE, async (_event, profileId, extensionId, enabled) => {
+    try {
+      toggleProfileExtension(profileId, extensionId, enabled);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  });
+}
+const archiver = require("archiver");
+const profileRepo$1 = new ProfileRepository();
+function ensureParentDir(filePath) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+async function exportProfileToZip(profileId, outputFilePath) {
+  const profile = profileRepo$1.getById(profileId);
+  if (!profile) {
+    return { success: false, error: `Profile not found: ${profileId}` };
+  }
+  const profileBaseDir = path.join(electron.app.getPath("userData"), "profiles", profileId);
+  if (!fs.existsSync(profileBaseDir)) {
+    return { success: false, error: `Profile directory not found: ${profileBaseDir}` };
+  }
+  ensureParentDir(outputFilePath);
+  return new Promise((resolve) => {
+    const output = fs.createWriteStream(outputFilePath);
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    output.on("close", () => {
+      resolve({ success: true, path: outputFilePath });
+    });
+    output.on("error", (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      resolve({ success: false, error: message });
+    });
+    archive.on("error", (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      resolve({ success: false, error: message });
+    });
+    archive.pipe(output);
+    const userDataDir = path.join(profileBaseDir, "user-data");
+    const cookiesDir = path.join(profileBaseDir, "cookies");
+    if (fs.existsSync(userDataDir)) {
+      archive.directory(userDataDir, "user-data");
+    }
+    if (fs.existsSync(cookiesDir)) {
+      archive.directory(cookiesDir, "cookies");
+    }
+    archive.append(JSON.stringify(profile, null, 2), { name: "profile.json" });
+    void archive.finalize();
+  });
+}
+const profileRepo = new ProfileRepository();
 function setupIpcHandlers() {
   setupProfileHandlers();
   setupProxyHandlers();
   setupGroupHandlers();
   setupBulkHandlers();
+  setupCookieHandlers();
+  setupBookmarkHandlers();
+  setupExtensionHandlers();
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_IMPORT_ZIP, async () => {
     console.log("Stub: profiles:importZip");
     return false;
   });
   electron.ipcMain.handle(IPC_CHANNELS.PROFILES_EXPORT_ZIP, async (_event, profileId) => {
-    console.log("Stub: profiles:exportZip", profileId);
+    const profile = profileRepo.getById(profileId);
+    if (!profile) {
+      return { success: false, error: `Profile not found: ${profileId}` };
+    }
+    const safeName = profile.name.replace(/[^a-zA-Z0-9-_]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || profile.id;
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const defaultPath = path.join(electron.app.getPath("downloads"), `${safeName}_${timestamp}.zip`);
+    const saveResult = await electron.dialog.showSaveDialog({
+      title: "Export Profile to ZIP",
+      defaultPath,
+      filters: [{ name: "ZIP Archive", extensions: ["zip"] }]
+    });
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { success: false, error: "Export canceled by user." };
+    }
+    return exportProfileToZip(profileId, saveResult.filePath);
   });
 }
 function createWindow() {

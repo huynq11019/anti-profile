@@ -89,8 +89,23 @@ const IPC_CHANNELS = {
   PROFILES_BULK_OPEN: "profiles:bulkOpen",
   PROFILES_BULK_CLOSE: "profiles:bulkClose",
   PROFILES_BULK_PROXY_ASSIGN: "profiles:bulkProxyAssign",
+  PROFILES_BULK_PROXY_ASSIGN_MAP: "profiles:bulkProxyAssignMap",
   PROFILES_IMPORT_ZIP: "profiles:importZip",
   PROFILES_EXPORT_ZIP: "profiles:exportZip",
+  PROFILES_OPEN_FOLDER: "profiles:openFolder",
+  COOKIES_READ: "cookies:read",
+  COOKIES_WRITE: "cookies:write",
+  COOKIES_CLEAR: "cookies:clear",
+  BOOKMARKS_LIST: "bookmarks:list",
+  BOOKMARKS_ADD: "bookmarks:add",
+  BOOKMARKS_DELETE: "bookmarks:delete",
+  BOOKMARKS_IMPORT_JSON: "bookmarks:importJson",
+  EXTENSIONS_LIST: "extensions:list",
+  EXTENSIONS_INSTALL_UNPACKED: "extensions:installUnpacked",
+  EXTENSIONS_INSTALL_CRX: "extensions:installCrx",
+  EXTENSIONS_INSTALL_WEBSTORE: "extensions:installWebstore",
+  EXTENSIONS_REMOVE: "extensions:remove",
+  EXTENSIONS_TOGGLE: "extensions:toggle",
   PROXIES_GET_ALL: "proxies:getAll",
   PROXIES_CREATE: "proxies:create",
   PROXIES_UPDATE: "proxies:update",
@@ -115,8 +130,10 @@ const api = {
     bulkOpen: (profileIds) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_OPEN, profileIds),
     bulkClose: (profileIds) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_CLOSE, profileIds),
     bulkAssignProxy: (profileIds, proxyId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, profileIds, proxyId),
+    bulkAssignProxyMap: (profileProxyMap) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN_MAP, profileProxyMap),
     importZip: () => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_IMPORT_ZIP),
-    exportZip: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId)
+    exportZip: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId),
+    openFolder: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_OPEN_FOLDER, profileId)
   },
   proxies: {
     getAll: () => electron.ipcRenderer.invoke(IPC_CHANNELS.PROXIES_GET_ALL),
@@ -129,6 +146,25 @@ const api = {
     create: (data) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_CREATE, data),
     update: (id, data) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_UPDATE, id, data),
     delete: (id) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_DELETE, id)
+  },
+  cookies: {
+    read: (profileId, format) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_READ, profileId, format),
+    write: (profileId, format, content) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_WRITE, profileId, format, content),
+    clear: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId)
+  },
+  bookmarks: {
+    list: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_LIST, profileId),
+    add: (profileId, bookmark) => electron.ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_ADD, profileId, bookmark),
+    delete: (profileId, bookmarkId) => electron.ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_DELETE, profileId, bookmarkId),
+    importJson: (profileId, jsonContent) => electron.ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_IMPORT_JSON, profileId, jsonContent)
+  },
+  extensions: {
+    list: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_LIST, profileId),
+    installUnpacked: (profileId, directoryPath) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_UNPACKED, profileId, directoryPath),
+    installCrx: (profileId, crxPath) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_CRX, profileId, crxPath),
+    installWebstore: (profileId, webstoreUrl) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_WEBSTORE, profileId, webstoreUrl),
+    remove: (profileId, extensionId) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_REMOVE, profileId, extensionId),
+    toggle: (profileId, extensionId, enabled) => electron.ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_TOGGLE, profileId, extensionId, enabled)
   },
   onProfileStatusChange: (callback) => {
     const handler = (_event, state) => callback(state);

@@ -6,7 +6,12 @@ import type {
   UiAlert,
   CookieFormat,
   CookieReadResult,
-  CookieWriteResult
+  CookieWriteResult,
+  ProfileExportZipResult,
+  BookmarkRecord,
+  BookmarkWriteResult,
+  ProfileExtensionRecord,
+  ExtensionWriteResult
 } from './index'
 import type { Group } from './index'
 
@@ -24,8 +29,10 @@ declare global {
         bulkOpen: (profileIds: string[]) => Promise<{ success: boolean; errors?: string[] }>
         bulkClose: (profileIds: string[]) => Promise<{ success: boolean; errors?: string[] }>
         bulkAssignProxy: (profileIds: string[], proxyId?: string) => Promise<{ success: boolean; errors?: string[] }>
+        bulkAssignProxyMap: (profileProxyMap: Record<string, string | undefined>) => Promise<{ success: boolean; errors?: string[] }>
         importZip: () => Promise<boolean>
-        exportZip: (profileId: string) => Promise<void>
+        exportZip: (profileId: string) => Promise<ProfileExportZipResult>
+        openFolder: (profileId: string) => Promise<{ success: boolean; error?: string }>
       }
       proxies: {
         getAll: () => Promise<Proxy[]>
@@ -43,6 +50,20 @@ declare global {
         read: (profileId: string, format: CookieFormat) => Promise<CookieReadResult>
         write: (profileId: string, format: CookieFormat, content: string) => Promise<CookieWriteResult>
         clear: (profileId: string) => Promise<CookieWriteResult>
+      }
+      bookmarks: {
+        list: (profileId: string) => Promise<BookmarkRecord[]>
+        add: (profileId: string, bookmark: { title: string; url: string; folder?: string }) => Promise<BookmarkWriteResult>
+        delete: (profileId: string, bookmarkId: string) => Promise<BookmarkWriteResult>
+        importJson: (profileId: string, jsonContent: string) => Promise<BookmarkWriteResult>
+      }
+      extensions: {
+        list: (profileId: string) => Promise<ProfileExtensionRecord[]>
+        installUnpacked: (profileId: string, directoryPath: string) => Promise<ExtensionWriteResult>
+        installCrx: (profileId: string, crxPath: string) => Promise<ExtensionWriteResult>
+        installWebstore: (profileId: string, webstoreUrl: string) => Promise<ExtensionWriteResult>
+        remove: (profileId: string, extensionId: string) => Promise<ExtensionWriteResult>
+        toggle: (profileId: string, extensionId: string, enabled: boolean) => Promise<ExtensionWriteResult>
       }
       onProfileStatusChange: (callback: (state: ProfileRuntimeState) => void) => () => void
       onSysMetrics: (callback: (metrics: SysMetrics) => void) => () => void

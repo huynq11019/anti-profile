@@ -49,6 +49,21 @@ async function bulkAssignProxy(profileIds: string[], proxyId?: string): Promise<
   return errors.length > 0 ? { success: false, errors } : { success: true }
 }
 
+async function bulkAssignProxyMap(profileProxyMap: Record<string, string | undefined>): Promise<BulkResult> {
+  const errors: string[] = []
+
+  for (const [profileId, proxyId] of Object.entries(profileProxyMap)) {
+    try {
+      profileRepo.update(profileId, { proxyId })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      errors.push(`${profileId}: ${message}`)
+    }
+  }
+
+  return errors.length > 0 ? { success: false, errors } : { success: true }
+}
+
 export function setupBulkHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_OPEN, async (_event, profileIds: string[]) => {
     return bulkOpen(profileIds)
@@ -60,6 +75,10 @@ export function setupBulkHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, async (_event, profileIds: string[], proxyId?: string) => {
     return bulkAssignProxy(profileIds, proxyId)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN_MAP, async (_event, profileProxyMap: Record<string, string | undefined>) => {
+    return bulkAssignProxyMap(profileProxyMap)
   })
 
   ipcMain.handle(IPC_CHANNELS.PROFILES_BULK_UPDATE, async (_event, profileIds: string[], updates: { proxyId?: string }) => {

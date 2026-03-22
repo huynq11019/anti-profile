@@ -7,6 +7,8 @@ import { Profiles } from '@renderer/pages/Profiles'
 import { ProxyManager } from '@renderer/pages/ProxyManager'
 import { Automation } from '@renderer/pages/Automation'
 import { CookiesManager } from '@renderer/pages/CookiesManager'
+import { BookmarksManager } from '@renderer/pages/BookmarksManager'
+import { ExtensionsManager } from '@renderer/pages/ExtensionsManager'
 import { Settings } from '@renderer/pages/Settings'
 import { CreateProfileModal } from '@renderer/components/modals/CreateProfileModal'
 import type { CreateProfileFormData } from '@renderer/components/modals/CreateProfileModal'
@@ -102,11 +104,11 @@ const App: React.FC = () => {
               />
               <Route
                 path="/extensions"
-                element={<PlaceholderPage title="Extensions" icon="extension" />}
+                element={<ExtensionsManager />}
               />
               <Route
-                path="/logs"
-                element={<PlaceholderPage title="Logs" icon="terminal" />}
+                path="/bookmarks"
+                element={<BookmarksManager />}
               />
               <Route
                 path="/settings"

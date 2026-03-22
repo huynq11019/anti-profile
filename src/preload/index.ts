@@ -10,7 +10,12 @@ import {
   UiAlert,
   CookieFormat,
   CookieReadResult,
-  CookieWriteResult
+  CookieWriteResult,
+  ProfileExportZipResult,
+  BookmarkRecord,
+  BookmarkWriteResult,
+  ProfileExtensionRecord,
+  ExtensionWriteResult
 } from '../shared/types'
 
 // Custom APIs for renderer
@@ -27,8 +32,12 @@ const api = {
     bulkClose: (profileIds: string[]) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_CLOSE, profileIds),
     bulkAssignProxy: (profileIds: string[], proxyId?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, profileIds, proxyId),
+    bulkAssignProxyMap: (profileProxyMap: Record<string, string | undefined>) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN_MAP, profileProxyMap),
     importZip: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_IMPORT_ZIP),
-    exportZip: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId),
+    exportZip: (profileId: string): Promise<ProfileExportZipResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId),
+    openFolder: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_OPEN_FOLDER, profileId),
   },
   proxies: {
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.PROXIES_GET_ALL),
@@ -48,6 +57,28 @@ const api = {
     write: (profileId: string, format: CookieFormat, content: string): Promise<CookieWriteResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.COOKIES_WRITE, profileId, format, content),
     clear: (profileId: string): Promise<CookieWriteResult> => ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId)
+  },
+  bookmarks: {
+    list: (profileId: string): Promise<BookmarkRecord[]> => ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_LIST, profileId),
+    add: (profileId: string, bookmark: { title: string; url: string; folder?: string }): Promise<BookmarkWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_ADD, profileId, bookmark),
+    delete: (profileId: string, bookmarkId: string): Promise<BookmarkWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_DELETE, profileId, bookmarkId),
+    importJson: (profileId: string, jsonContent: string): Promise<BookmarkWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_IMPORT_JSON, profileId, jsonContent)
+  },
+  extensions: {
+    list: (profileId: string): Promise<ProfileExtensionRecord[]> => ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_LIST, profileId),
+    installUnpacked: (profileId: string, directoryPath: string): Promise<ExtensionWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_UNPACKED, profileId, directoryPath),
+    installCrx: (profileId: string, crxPath: string): Promise<ExtensionWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_CRX, profileId, crxPath),
+    installWebstore: (profileId: string, webstoreUrl: string): Promise<ExtensionWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_INSTALL_WEBSTORE, profileId, webstoreUrl),
+    remove: (profileId: string, extensionId: string): Promise<ExtensionWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_REMOVE, profileId, extensionId),
+    toggle: (profileId: string, extensionId: string, enabled: boolean): Promise<ExtensionWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.EXTENSIONS_TOGGLE, profileId, extensionId, enabled)
   },
   onProfileStatusChange: (callback: (state: ProfileRuntimeState) => void) => {
     const handler = (_event: any, state: ProfileRuntimeState) => callback(state)

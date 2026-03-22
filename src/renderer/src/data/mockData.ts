@@ -97,8 +97,8 @@ export const NAV_ITEMS = [
   { label: 'Proxy Manager', icon: 'vpn_lock', path: '/proxy' },
   { label: 'Automation', icon: 'auto_mode', path: '/automation' },
   { label: 'Cookies', icon: 'cookie', path: '/cookies' },
+  { label: 'Bookmarks', icon: 'bookmarks', path: '/bookmarks' },
   { label: 'Extensions', icon: 'extension', path: '/extensions' },
-  { label: 'Logs', icon: 'terminal', path: '/logs' },
   { label: 'Settings', icon: 'settings', path: '/settings' },
 ]
 

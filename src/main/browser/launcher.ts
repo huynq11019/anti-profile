@@ -13,6 +13,7 @@ import {
   setProfileProcess
 } from './processTracker'
 import { broadcastProfileError, broadcastProfileStatus } from '../ipc/statusBroadcaster'
+import { listEnabledExtensionPaths } from '../services/extensionService'
 import type { Profile } from '../../shared/types'
 
 type StartResult = { success: boolean; errors?: string[] }
@@ -42,11 +43,18 @@ function buildChromiumArgs(profile: Profile, proxyServerUrl?: string): string[] 
     '--no-first-run',
     '--no-default-browser-check',
     '--new-window',
-    'about:blank'
+    'https://google.com'
   ]
 
   if (proxyServerUrl) {
     args.splice(1, 0, `--proxy-server=${proxyServerUrl}`)
+  }
+
+  const extensionPaths = listEnabledExtensionPaths(profile.id)
+  if (extensionPaths.length > 0) {
+    const joined = extensionPaths.join(',')
+    args.splice(1, 0, `--disable-extensions-except=${joined}`)
+    args.splice(2, 0, `--load-extension=${joined}`)
   }
 
   return args

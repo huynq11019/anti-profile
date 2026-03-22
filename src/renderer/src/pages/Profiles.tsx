@@ -1,7 +1,9 @@
 import React from 'react'
-import { Profile } from '@shared/types'
+import { Profile, Proxy } from '@shared/types'
 import { ProfileRow } from '@renderer/components/profiles/ProfileRow'
 import { useDashboard } from '@renderer/hooks/useDashboard'
+
+type BulkAction = 'open' | 'close' | 'assignProxy' | 'removeProxy' | 'assignProxyMap'
 
 interface ProfilesProps {
   readonly onCreateProfile?: () => void
@@ -9,7 +11,13 @@ interface ProfilesProps {
 }
 
 export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfile }) => {
-  const [bulkAction, setBulkAction] = React.useState<'open' | 'close' | 'assignProxy'>('open')
+  const [bulkAction, setBulkAction] = React.useState<BulkAction>('open')
+  const [allProxies, setAllProxies] = React.useState<Proxy[]>([])
+  const [showProxyMapModal, setShowProxyMapModal] = React.useState(false)
+  const [proxyMapDraft, setProxyMapDraft] = React.useState<Record<string, string | undefined>>({})
+  const [currentPage, setCurrentPage] = React.useState(1)
+
+  const itemsPerPage = 10
 
   const {
     profiles,
@@ -20,20 +28,89 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
     searchQuery,
     setSearchQuery,
     handleSelect,
-    handleSelectAll,
     handleLaunch,
     handleStop,
     handleDelete,
+    handleTogglePin,
+    handleOpenFolder,
+    handleExportZip,
     handleBulkOpen,
     handleBulkClose,
     handleBulkAssignProxy,
+    handleBulkAssignProxyMap,
     clearSelection,
   } = useDashboard()
 
   const selectedProfileIds = React.useMemo(() => Array.from(selectedIds), [selectedIds])
+  const selectedProfiles = React.useMemo(
+    () => allProfiles.filter((profile) => selectedIds.has(profile.id)),
+    [allProfiles, selectedIds]
+  )
 
-  const allSelected = selectedIds.size === profiles.length && profiles.length > 0
-  const someSelected = selectedIds.size > 0 && !allSelected
+  const totalPages = Math.max(1, Math.ceil(profiles.length / itemsPerPage))
+
+  const safeCurrentPage = React.useMemo(() => {
+    if (currentPage < 1) return 1
+    if (currentPage > totalPages) return totalPages
+    return currentPage
+  }, [currentPage, totalPages])
+
+  const paginatedProfiles = React.useMemo(() => {
+    const start = (safeCurrentPage - 1) * itemsPerPage
+    return profiles.slice(start, start + itemsPerPage)
+  }, [profiles, safeCurrentPage])
+
+  const pageProfileIds = React.useMemo(() => paginatedProfiles.map((profile) => profile.id), [paginatedProfiles])
+
+  const allSelected = pageProfileIds.length > 0 && pageProfileIds.every((id) => selectedIds.has(id))
+  const someSelected = pageProfileIds.some((id) => selectedIds.has(id)) && !allSelected
+
+  const pageNumberItems = React.useMemo(() => {
+    const maxButtons = 5
+    const half = Math.floor(maxButtons / 2)
+    let start = Math.max(1, safeCurrentPage - half)
+    let end = Math.min(totalPages, start + maxButtons - 1)
+
+    if (end - start + 1 < maxButtons) {
+      start = Math.max(1, end - maxButtons + 1)
+    }
+
+    const pages: number[] = []
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page)
+    }
+
+    return pages
+  }, [safeCurrentPage, totalPages])
+
+  React.useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage)
+    }
+  }, [currentPage, safeCurrentPage])
+
+  React.useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  React.useEffect(() => {
+    const loadDependencies = async () => {
+      try {
+        const fetchedProxies = await window.api.proxies.getAll()
+        setAllProxies(fetchedProxies)
+      } catch (err) {
+        console.error('Failed to load proxies:', err)
+      }
+    }
+
+    void loadDependencies()
+  }, [])
+
+  const toggleSelectAllOnPage = (checked: boolean) => {
+    pageProfileIds.forEach((id) => {
+      handleSelect(id, checked)
+    })
+  }
 
   const stats = [
     { label: 'Profiles', value: allProfiles.length.toString(), icon: 'person_pin' },
@@ -76,7 +153,7 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
         await handleBulkOpen(selectedProfileIds)
       } else if (bulkAction === 'close') {
         await handleBulkClose(selectedProfileIds)
-      } else {
+      } else if (bulkAction === 'assignProxy') {
         const input = window.prompt('Enter proxy id to assign (leave empty to clear proxy):', '')
         if (input === null) {
           return
@@ -84,9 +161,43 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
 
         const proxyId = input.trim() || undefined
         await handleBulkAssignProxy(selectedProfileIds, proxyId)
+      } else if (bulkAction === 'removeProxy') {
+        await handleBulkAssignProxy(selectedProfileIds, undefined)
+      } else {
+        if (allProxies.length === 0) {
+          window.alert('No proxies available. Create proxies first in Proxy Manager.')
+          return
+        }
+
+        const draft: Record<string, string | undefined> = {}
+        selectedProfiles.forEach((profile, idx) => {
+          const autoProxy = allProxies[idx % allProxies.length]
+          draft[profile.id] = autoProxy?.id
+        })
+
+        setProxyMapDraft(draft)
+        setShowProxyMapModal(true)
+        return
       }
 
       clearSelection()
+    })
+  }
+
+  const applyProxyMapDraft = async () => {
+    await runProfileAction(async () => {
+      await handleBulkAssignProxyMap(proxyMapDraft)
+      setShowProxyMapModal(false)
+      clearSelection()
+    })
+  }
+
+  const runExportZip = async (profile: Profile) => {
+    await runProfileAction(async () => {
+      const zipPath = await handleExportZip(profile.id)
+      if (zipPath) {
+        window.alert(`Profile exported successfully:\n${zipPath}`)
+      }
     })
   }
 
@@ -142,29 +253,33 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
               className="flex items-center gap-1.5 border border-primary text-primary 
                 px-4 py-2 rounded text-sm font-semibold hover:bg-primary/[0.06] transition-colors"
               id="new-profile-btn"
+              title="Tạo profile mới"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               New Profile
             </button>
-            <button className="btn-secondary flex items-center gap-1.5 text-sm">
+            <button className="btn-secondary flex items-center gap-1.5 text-sm" title="Nhập profile từ file (đang phát triển)">
               <span className="material-symbols-outlined text-[18px]">upload_file</span>
               Import
             </button>
             <div className="relative flex items-center gap-2">
               <select
                 value={bulkAction}
-                onChange={(e) => setBulkAction(e.target.value as 'open' | 'close' | 'assignProxy')}
+                onChange={(e) => setBulkAction(e.target.value as BulkAction)}
                 className="btn-secondary text-sm h-[36px] pr-8"
               >
                 <option value="open">Bulk Open</option>
                 <option value="close">Bulk Close</option>
                 <option value="assignProxy">Bulk Proxy Assign</option>
+                <option value="removeProxy">Bulk Remove Proxy</option>
+                <option value="assignProxyMap">Bulk Unique Proxy (Per Account)</option>
               </select>
               <button
                 onClick={() => {
                   void runBulkAction()
                 }}
                 className="btn-secondary flex items-center gap-1.5 text-sm"
+                title="Chạy thao tác hàng loạt"
               >
                 Run ({selectedProfileIds.length})
               </button>
@@ -186,10 +301,10 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                   focus:outline-none focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
-            <button className="btn-secondary p-2.5">
+            <button className="btn-secondary p-2.5" title="Bộ lọc (đang phát triển)">
               <span className="material-symbols-outlined text-[20px]">filter_alt</span>
             </button>
-            <button className="btn-secondary p-2.5">
+            <button className="btn-secondary p-2.5" title="Sắp xếp (đang phát triển)">
               <span className="material-symbols-outlined text-[20px]">sort</span>
             </button>
           </div>
@@ -211,7 +326,7 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                     type="checkbox"
                     checked={allSelected}
                     ref={(el) => { if (el) el.indeterminate = someSelected }}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
                     className="rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface"
                   />
                 </th>
@@ -244,7 +359,7 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                 </tr>
               )}
 
-              {profiles.map((profile) => (
+              {paginatedProfiles.map((profile) => (
                 <ProfileRow
                   key={profile.id}
                   profile={profile}
@@ -257,6 +372,15 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                     void runProfileAction(() => handleStop(id))
                   }}
                   onEdit={(profile) => onEditProfile?.(profile)}
+                  onTogglePin={(id) => {
+                    void runProfileAction(() => handleTogglePin(id))
+                  }}
+                  onOpenFolder={(id) => {
+                    void runProfileAction(() => handleOpenFolder(id))
+                  }}
+                  onExportZip={(profile) => {
+                    void runExportZip(profile)
+                  }}
                   onDelete={(id) => {
                     void runProfileAction(() => handleDelete(id))
                   }}
@@ -268,16 +392,27 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
 
         {/* Pagination */}
         <div className="mt-5 flex items-center justify-between text-xs text-on-surface-variant">
-          <p>Showing 1-{profiles.length} of {allProfiles.length} profiles</p>
+          <p>
+            Showing {profiles.length === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage + 1}-
+            {Math.min(safeCurrentPage * itemsPerPage, profiles.length)} of {profiles.length} profiles
+            {profiles.length !== allProfiles.length ? ` (total ${allProfiles.length})` : ''}
+          </p>
           <div className="flex items-center gap-1.5">
-            <button className="p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors">
+            <button
+              type="button"
+              disabled={safeCurrentPage <= 1}
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              className="p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-[18px]">chevron_left</span>
             </button>
-            {[1, 2, 3].map((n) => (
+            {pageNumberItems.map((n) => (
               <button
                 key={n}
+                type="button"
+                onClick={() => setCurrentPage(n)}
                 className={`w-8 h-8 rounded font-bold text-xs transition-colors ${
-                  n === 1
+                  n === safeCurrentPage
                     ? 'btn-primary'
                     : 'text-on-surface-variant hover:bg-surface-container-highest'
                 }`}
@@ -285,12 +420,74 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                 {n}
               </button>
             ))}
-            <button className="p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors">
+            <button
+              type="button"
+              disabled={safeCurrentPage >= totalPages}
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              className="p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-[18px]">chevron_right</span>
             </button>
           </div>
         </div>
       </section>
+
+      {showProxyMapModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
+          <div className="w-full max-w-[760px] rounded-lg border border-outline-variant/20 bg-surface-container-high shadow-2xl">
+            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-on-surface">Bulk Unique Proxy Assignment</h3>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  Auto-mapped sequentially. You can adjust proxy for each selected profile.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowProxyMapModal(false)}
+                className="p-1.5 text-on-surface-variant hover:text-on-surface"
+                aria-label="Close"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="px-6 py-4 max-h-[380px] overflow-y-auto space-y-3">
+              {selectedProfiles.map((profile) => (
+                <div key={profile.id} className="grid grid-cols-[1fr_280px] items-center gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-on-surface">{profile.name}</p>
+                    <p className="text-[11px] text-on-surface-variant">{profile.id}</p>
+                  </div>
+                  <select
+                    value={proxyMapDraft[profile.id] ?? ''}
+                    onChange={(event) => {
+                      const value = event.target.value || undefined
+                      setProxyMapDraft((prev) => ({ ...prev, [profile.id]: value }))
+                    }}
+                    className="w-full bg-surface-container-highest border border-outline-variant/30 rounded px-3 py-2 text-sm text-on-surface"
+                  >
+                    <option value="">— No Proxy —</option>
+                    {allProxies.map((proxy) => (
+                      <option key={proxy.id} value={proxy.id}>
+                        {proxy.alias} ({proxy.host}:{proxy.port})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/[0.06] flex justify-end gap-3">
+              <button className="btn-secondary text-sm" onClick={() => setShowProxyMapModal(false)}>
+                Cancel
+              </button>
+              <button className="btn-primary text-sm" onClick={() => void applyProxyMapDraft()}>
+                Apply Mapping
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

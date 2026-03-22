@@ -161,6 +161,27 @@ description: "Task list template for feature implementation"
 
 ---
 
+## Phase 11: Profile Management Enhancements (Priority: P1)
+
+**Goal**: Provide full quick-actions workflow for profile operations in both inline row actions and edit modal flow.
+
+**Independent Test**: From Profiles page, execute pin/open-folder/proxy bulk operations, and verify persistence + behavior after reload.
+
+### Implementation for Profile Management Enhancements
+
+- [x] T044 [US11] Add pin-to-top behavior by sorting pinned profiles first in `src/main/repositories/profileRepo.ts`
+- [x] T045 [US11] Add open profile folder IPC + preload bridge in `src/main/ipc/profileHandlers.ts`, `src/shared/types/index.ts`, `src/preload/index.ts`
+- [x] T046 [US11] Add one-to-one bulk proxy assignment IPC in `src/main/ipc/bulkHandlers.ts` and bridge typing in `src/shared/types/window.d.ts`
+- [x] T047 [US11] Add inline pin/open-folder quick actions in `src/renderer/src/components/profiles/ProfileRow.tsx`
+- [x] T048 [US11] Extend Profiles bulk toolbar with remove-proxy + unique-proxy mapping modal in `src/renderer/src/pages/Profiles.tsx`
+- [x] T049 [US11] Extend dashboard hook orchestration for pin/open-folder/proxy-map actions in `src/renderer/src/hooks/useDashboard.ts`
+- [x] T050 [US11] Add inline quick edit for profile name/group/note in `src/renderer/src/components/profiles/ProfileRow.tsx` and `src/renderer/src/pages/Profiles.tsx`
+- [x] T051 [US11] Implement extensions install/remove/toggle flow (unpacked, CRX, webstore URL) in `src/main/services/` + `src/main/ipc/` + `src/renderer/src/pages/`
+- [x] T052 [US11] Implement bookmarks add/delete/import JSON with restart-required policy in `src/main/ipc/` + `src/main/repositories/` + `src/renderer/src/pages/`
+- [x] T053 [US11] Implement profile export ZIP with Save dialog in `src/main/ipc/index.ts` and `src/main/services/`
+
+---
+
 ## Final Phase: Polish & Cross-Cutting Concerns
 
 **Purpose**: Improvements that affect multiple user stories

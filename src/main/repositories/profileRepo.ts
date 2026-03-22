@@ -88,7 +88,7 @@ export class ProfileRepository {
           SELECT id, name, group_id, note, proxy_id, ${this.hasFingerprintSeedColumn ? 'fingerprint_seed,' : ''} user_agent, timezone,
                  ${this.hasTagsColumn ? 'tags,' : ''} is_pinned, last_opened, created_at
           FROM profiles
-          ORDER BY datetime(created_at) DESC
+          ORDER BY is_pinned DESC, datetime(created_at) DESC
         `
       )
       .all() as ProfileRow[]

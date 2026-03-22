@@ -60,6 +60,43 @@ export interface CookieWriteResult {
   error?: string
 }
 
+export interface ProfileExportZipResult {
+  success: boolean
+  path?: string
+  error?: string
+}
+
+export interface BookmarkRecord {
+  id: string
+  profileId: string
+  title: string
+  url: string
+  folder?: string
+  createdAt: string
+}
+
+export interface BookmarkWriteResult {
+  success: boolean
+  count: number
+  error?: string
+}
+
+export interface ProfileExtensionRecord {
+  id: string
+  profileId: string
+  extensionName: string
+  extensionPath: string
+  source: 'unpacked' | 'crx' | 'webstore'
+  sourceRef?: string
+  enabled: boolean
+  createdAt: string
+}
+
+export interface ExtensionWriteResult {
+  success: boolean
+  error?: string
+}
+
 // Proxy entity
 export interface Proxy {
   id: string
@@ -92,12 +129,26 @@ export const IPC_CHANNELS = {
   PROFILES_BULK_OPEN: 'profiles:bulkOpen',
   PROFILES_BULK_CLOSE: 'profiles:bulkClose',
   PROFILES_BULK_PROXY_ASSIGN: 'profiles:bulkProxyAssign',
+  PROFILES_BULK_PROXY_ASSIGN_MAP: 'profiles:bulkProxyAssignMap',
   PROFILES_IMPORT_ZIP: 'profiles:importZip',
   PROFILES_EXPORT_ZIP: 'profiles:exportZip',
+  PROFILES_OPEN_FOLDER: 'profiles:openFolder',
 
   COOKIES_READ: 'cookies:read',
   COOKIES_WRITE: 'cookies:write',
   COOKIES_CLEAR: 'cookies:clear',
+
+  BOOKMARKS_LIST: 'bookmarks:list',
+  BOOKMARKS_ADD: 'bookmarks:add',
+  BOOKMARKS_DELETE: 'bookmarks:delete',
+  BOOKMARKS_IMPORT_JSON: 'bookmarks:importJson',
+
+  EXTENSIONS_LIST: 'extensions:list',
+  EXTENSIONS_INSTALL_UNPACKED: 'extensions:installUnpacked',
+  EXTENSIONS_INSTALL_CRX: 'extensions:installCrx',
+  EXTENSIONS_INSTALL_WEBSTORE: 'extensions:installWebstore',
+  EXTENSIONS_REMOVE: 'extensions:remove',
+  EXTENSIONS_TOGGLE: 'extensions:toggle',
   
   PROXIES_GET_ALL: 'proxies:getAll',
   PROXIES_CREATE: 'proxies:create',

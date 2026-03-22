@@ -113,6 +113,37 @@ export const useDashboard = () => {
     })
   }, [])
 
+  const handleTogglePin = useCallback(async (id: string) => {
+    const target = profiles.find((profile) => profile.id === id)
+    if (!target) {
+      throw new Error(`Profile not found: ${id}`)
+    }
+
+    await window.api.profiles.update(id, { isPinned: !target.isPinned })
+    await loadProfiles()
+  }, [loadProfiles, profiles])
+
+  const handleOpenFolder = useCallback(async (id: string) => {
+    const result = await window.api.profiles.openFolder(id)
+    if (!result.success) {
+      throw new Error(result.error ?? 'Failed to open profile folder.')
+    }
+  }, [])
+
+  const handleQuickUpdate = useCallback(async (id: string, updates: Partial<Profile>) => {
+    const updated = await window.api.profiles.update(id, updates)
+    setProfiles((prev) => prev.map((profile) => (profile.id === id ? { ...profile, ...updated } : profile)))
+  }, [])
+
+  const handleExportZip = useCallback(async (id: string) => {
+    const result = await window.api.profiles.exportZip(id)
+    if (!result.success) {
+      throw new Error(result.error ?? 'Failed to export profile ZIP.')
+    }
+
+    return result.path
+  }, [])
+
   const handleBulkOpen = useCallback(async (profileIds: string[]) => {
     const result = await window.api.profiles.bulkOpen(profileIds)
     if (!result.success) {
@@ -136,6 +167,21 @@ export const useDashboard = () => {
     setProfiles((prev) => prev.map((profile) => (profileIds.includes(profile.id) ? { ...profile, proxyId } : profile)))
   }, [])
 
+  const handleBulkAssignProxyMap = useCallback(async (profileProxyMap: Record<string, string | undefined>) => {
+    const result = await window.api.profiles.bulkAssignProxyMap(profileProxyMap)
+    if (!result.success) {
+      throw new Error(result.errors?.join(', ') ?? 'Bulk proxy map assign failed.')
+    }
+
+    setProfiles((prev) =>
+      prev.map((profile) =>
+        Object.prototype.hasOwnProperty.call(profileProxyMap, profile.id)
+          ? { ...profile, proxyId: profileProxyMap[profile.id] }
+          : profile
+      )
+    )
+  }, [])
+
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set())
   }, [])
@@ -154,9 +200,14 @@ export const useDashboard = () => {
     handleLaunch,
     handleStop,
     handleDelete,
+    handleTogglePin,
+    handleOpenFolder,
+    handleQuickUpdate,
+    handleExportZip,
     handleBulkOpen,
     handleBulkClose,
     handleBulkAssignProxy,
+    handleBulkAssignProxyMap,
     clearSelection,
   }
 }
