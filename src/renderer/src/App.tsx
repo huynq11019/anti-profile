@@ -9,6 +9,8 @@ import { Automation } from '@renderer/pages/Automation'
 import { CookiesManager } from '@renderer/pages/CookiesManager'
 import { Settings } from '@renderer/pages/Settings'
 import { CreateProfileModal } from '@renderer/components/modals/CreateProfileModal'
+import type { CreateProfileFormData } from '@renderer/components/modals/CreateProfileModal'
+import type { Profile } from '@shared/types'
 
 // Lazy placeholder pages for other routes
 const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, icon }) => (
@@ -21,12 +23,55 @@ const PlaceholderPage: React.FC<{ title: string; icon: string }> = ({ title, ico
 
 const App: React.FC = () => {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false)
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
+
+  const openCreateModal = () => {
+    setEditingProfile(null)
+    setCreateModalOpen(true)
+  }
+
+  const openEditModal = (profile: Profile) => {
+    setEditingProfile(profile)
+    setCreateModalOpen(true)
+  }
+
+  const handleCreateProfile = async (data: CreateProfileFormData) => {
+    const tags = data.tags
+      ? data.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      : undefined
+
+    if (data.id) {
+      await window.api.profiles.update(data.id, {
+        name: data.name,
+        proxyId: data.proxyId || undefined,
+        userAgent: data.userAgent || undefined,
+        timezone: data.timezone || undefined,
+        note: data.note || undefined,
+        tags
+      })
+    } else {
+      await window.api.profiles.create({
+        name: data.name,
+        proxyId: data.proxyId || undefined,
+        userAgent: data.userAgent || undefined,
+        timezone: data.timezone || undefined,
+        note: data.note || undefined,
+        tags
+      })
+    }
+
+    window.dispatchEvent(new Event('profiles:changed'))
+    setEditingProfile(null)
+  }
 
   return (
     <BrowserRouter>
       <div className="flex h-screen bg-surface overflow-hidden">
         {/* Fixed header */}
-        <Header onCreateProfile={() => setCreateModalOpen(true)} />
+        <Header onCreateProfile={openCreateModal} />
 
         {/* Fixed sidebar */}
         <Sidebar />
@@ -41,7 +86,7 @@ const App: React.FC = () => {
               />
               <Route
                 path="/profiles"
-                element={<Profiles onCreateProfile={() => setCreateModalOpen(true)} />}
+                element={<Profiles onCreateProfile={openCreateModal} onEditProfile={openEditModal} />}
               />
               <Route
                 path="/proxy"
@@ -74,8 +119,12 @@ const App: React.FC = () => {
         {/* Create Profile Modal */}
         <CreateProfileModal
           isOpen={isCreateModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          onSubmit={(data) => console.log('Create profile:', data)}
+          onClose={() => {
+            setCreateModalOpen(false)
+            setEditingProfile(null)
+          }}
+          initialProfile={editingProfile}
+          onSubmit={handleCreateProfile}
         />
       </div>
     </BrowserRouter>

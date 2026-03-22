@@ -35,7 +35,7 @@ description: "Task list template for feature implementation"
 - [x] T005 Setup SQLite database connection and migration runner using `better-sqlite3` in `src/main/database/db.ts`
 - [x] T006 Implement IPC bridge in `src/preload/index.ts` and `src/main/ipc/`
 - [x] T007 [P] Define shared TypeScript interfaces for Profile, Proxy, and Group in `src/shared/types/`
-- [ ] T008 Setup Chromium binary management utility to download/locate Ungoogled Chromium in `src/main/browser/browserManager.ts`
+- [x] T008 Setup Chromium binary management utility to download/locate Ungoogled Chromium in `src/main/browser/browserManager.ts`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -49,12 +49,12 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 1
 
-- [ ] T009 [P] [US1] Create SQLite table and Repository for Profiles in `src/main/repositories/profileRepo.ts`
-- [ ] T010 [US1] Implement Main process IPC handlers for `profiles:*` crud in `src/main/ipc/profileHandlers.ts`
-- [ ] T011 [US1] Implement isolated Browser Launch logic in Main process using `child_process.spawn` in `src/main/browser/launcher.ts`
+- [x] T009 [P] [US1] Create SQLite table and Repository for Profiles in `src/main/repositories/profileRepo.ts`
+- [x] T010 [US1] Implement Main process IPC handlers for `profiles:*` crud in `src/main/ipc/profileHandlers.ts`
+- [x] T011 [US1] Implement isolated Browser Launch logic in Main process using `child_process.spawn` in `src/main/browser/launcher.ts`
 - [x] T012 [P] [US1] Build "Dashboard" screen UI component in `src/renderer/pages/Dashboard.tsx`
 - [x] T013 [P] [US1] Build "Create Profile Modal" UI component in `src/renderer/components/modals/CreateProfileModal.tsx`
-- [ ] T014 [US1] Integrate Dashboard and Modal with IPC to fetch, display, and create profiles
+- [x] T014 [US1] Integrate Dashboard and Modal with IPC to fetch, display, and create profiles
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently.
 
@@ -68,9 +68,9 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Extend Profile schema to save `fingerprint_seed` via migrations
-- [ ] T016 [US2] Implement Fingerprint generation logic (Canvas, WebGL, UserAgent) based on seed in `src/main/browser/fingerprintEngine.ts`
-- [ ] T017 [US2] Inject fingerprint spoofing arguments into Chromium launch sequence in `src/main/browser/launcher.ts`
+- [x] T015 [US2] Extend Profile schema to save `fingerprint_seed` via migrations
+- [x] T016 [US2] Implement Fingerprint generation logic (Canvas, WebGL, UserAgent) based on seed in `src/main/browser/fingerprintEngine.ts`
+- [x] T017 [US2] Inject fingerprint spoofing arguments into Chromium launch sequence in `src/main/browser/launcher.ts`
 
 ---
 
@@ -82,11 +82,11 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 3 & 8
 
-- [ ] T018 [P] [US3] Create SQLite tables and Repositories for Proxies and Groups in `src/main/repositories/`
-- [ ] T019 [US3] Implement Main IPC handlers for Proxy and Group CRUD operations in `src/main/ipc/`
+- [x] T018 [P] [US3] Create SQLite tables and Repositories for Proxies and Groups in `src/main/repositories/`
+- [x] T019 [US3] Implement Main IPC handlers for Proxy and Group CRUD operations in `src/main/ipc/`
 - [x] T020 [P] [US3] Build "Proxy Manager" screen UI component in `src/renderer/pages/ProxyManager.tsx`
-- [ ] T021 [US3] Integrate `proxy-chain` to create local authenticated upstream tunnels in `src/main/browser/proxyServer.ts`
-- [ ] T022 [US3] Modify Chromium launch sequence to route traffic through local tunnel when proxy is assigned
+- [x] T021 [US3] Integrate `proxy-chain` to create local authenticated upstream tunnels in `src/main/browser/proxyServer.ts`
+- [x] T022 [US3] Modify Chromium launch sequence to route traffic through local tunnel when proxy is assigned
 
 ---
 
@@ -98,9 +98,9 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Implement PID tracking map in Main process to track running browser instances in `src/main/browser/processTracker.ts`
-- [ ] T024 [US4] Add IPC event broadcasting to push real-time status to Renderer in `src/main/ipc/statusBroadcaster.ts`
-- [ ] T025 [US4] Update Dashboard UI to reflect "Running/Closed" status dynamically and handle Start/Stop actions
+- [x] T023 [US4] Implement PID tracking map in Main process to track running browser instances in `src/main/browser/processTracker.ts`
+- [x] T024 [US4] Add IPC event broadcasting to push real-time status to Renderer in `src/main/ipc/statusBroadcaster.ts`
+- [x] T025 [US4] Update Dashboard UI to reflect "Running/Closed" status dynamically and handle Start/Stop actions
 
 ---
 
@@ -113,8 +113,8 @@ description: "Task list template for feature implementation"
 ### Implementation for User Story 6
 
 - [x] T026 [P] [US6] Add checkbox selection state and Bulk Action dropdown to Dashboard table in `src/renderer/pages/Dashboard.tsx`
-- [ ] T027 [US6] Implement IPC handlers for Bulk Open, Bulk Close, and Bulk Proxy Assign in `src/main/ipc/bulkHandlers.ts`
-- [ ] T028 [US6] Implement queue manager in `src/main/browser/queueManager.ts` to prevent system crash when bulk opening 50+ profiles
+- [x] T027 [US6] Implement IPC handlers for Bulk Open, Bulk Close, and Bulk Proxy Assign in `src/main/ipc/bulkHandlers.ts`
+- [x] T028 [US6] Implement queue manager in `src/main/browser/queueManager.ts` to prevent system crash when bulk opening 50+ profiles
 
 ---
 
@@ -126,9 +126,9 @@ description: "Task list template for feature implementation"
 
 ### Implementation for User Story 7
 
-- [ ] T029 [US7] Implement IPC handlers to read/write specific profile's Netscape/JSON cookie files in `src/main/ipc/cookieHandlers.ts`
+- [x] T029 [US7] Implement IPC handlers to read/write specific profile's Netscape/JSON cookie files in `src/main/ipc/cookieHandlers.ts`
 - [x] T030 [P] [US7] Build "Cookies Management" screen UI component in `src/renderer/pages/CookiesManager.tsx`
-- [ ] T031 [US7] Integrate drag & drop cookie import and table viewer logic in UI
+- [x] T031 [US7] Integrate drag & drop cookie import and table viewer logic in UI
 
 ---
 

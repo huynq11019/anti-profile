@@ -86,12 +86,19 @@ const IPC_CHANNELS = {
   PROFILES_START: "profiles:start",
   PROFILES_STOP: "profiles:stop",
   PROFILES_BULK_UPDATE: "profiles:bulkUpdate",
+  PROFILES_BULK_OPEN: "profiles:bulkOpen",
+  PROFILES_BULK_CLOSE: "profiles:bulkClose",
+  PROFILES_BULK_PROXY_ASSIGN: "profiles:bulkProxyAssign",
   PROFILES_IMPORT_ZIP: "profiles:importZip",
   PROFILES_EXPORT_ZIP: "profiles:exportZip",
   PROXIES_GET_ALL: "proxies:getAll",
   PROXIES_CREATE: "proxies:create",
   PROXIES_UPDATE: "proxies:update",
   PROXIES_DELETE: "proxies:delete",
+  GROUPS_GET_ALL: "groups:getAll",
+  GROUPS_CREATE: "groups:create",
+  GROUPS_UPDATE: "groups:update",
+  GROUPS_DELETE: "groups:delete",
   STATUS_PROFILE_CHANGED: "status:profileChanged",
   STATUS_SYS_METRICS: "status:sysMetrics",
   UI_ALERTS: "ui:alerts"
@@ -105,6 +112,9 @@ const api = {
     start: (profilesIdList) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_START, profilesIdList),
     stop: (profilesIdList) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_STOP, profilesIdList),
     bulkUpdate: (profileIds, updates) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_UPDATE, profileIds, updates),
+    bulkOpen: (profileIds) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_OPEN, profileIds),
+    bulkClose: (profileIds) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_CLOSE, profileIds),
+    bulkAssignProxy: (profileIds, proxyId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, profileIds, proxyId),
     importZip: () => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_IMPORT_ZIP),
     exportZip: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId)
   },
@@ -113,6 +123,12 @@ const api = {
     create: (data) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROXIES_CREATE, data),
     update: (id, data) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROXIES_UPDATE, id, data),
     delete: (id) => electron.ipcRenderer.invoke(IPC_CHANNELS.PROXIES_DELETE, id)
+  },
+  groups: {
+    getAll: () => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_GET_ALL),
+    create: (data) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_CREATE, data),
+    update: (id, data) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_UPDATE, id, data),
+    delete: (id) => electron.ipcRenderer.invoke(IPC_CHANNELS.GROUPS_DELETE, id)
   },
   onProfileStatusChange: (callback) => {
     const handler = (_event, state) => callback(state);

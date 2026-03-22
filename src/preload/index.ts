@@ -1,6 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { IPC_CHANNELS, Profile, Proxy, ProfileRuntimeState, SysMetrics, UiAlert } from '../shared/types'
+import {
+  IPC_CHANNELS,
+  Profile,
+  Proxy,
+  Group,
+  ProfileRuntimeState,
+  SysMetrics,
+  UiAlert,
+  CookieFormat,
+  CookieReadResult,
+  CookieWriteResult
+} from '../shared/types'
 
 // Custom APIs for renderer
 const api = {
@@ -12,6 +23,10 @@ const api = {
     start: (profilesIdList: string[]) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_START, profilesIdList),
     stop: (profilesIdList: string[]) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_STOP, profilesIdList),
     bulkUpdate: (profileIds: string[], updates: Partial<Profile>) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_UPDATE, profileIds, updates),
+    bulkOpen: (profileIds: string[]) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_OPEN, profileIds),
+    bulkClose: (profileIds: string[]) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_CLOSE, profileIds),
+    bulkAssignProxy: (profileIds: string[], proxyId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROFILES_BULK_PROXY_ASSIGN, profileIds, proxyId),
     importZip: () => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_IMPORT_ZIP),
     exportZip: (profileId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROFILES_EXPORT_ZIP, profileId),
   },
@@ -20,6 +35,19 @@ const api = {
     create: (data: Partial<Proxy>) => ipcRenderer.invoke(IPC_CHANNELS.PROXIES_CREATE, data),
     update: (id: string, data: Partial<Proxy>) => ipcRenderer.invoke(IPC_CHANNELS.PROXIES_UPDATE, id, data),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PROXIES_DELETE, id),
+  },
+  groups: {
+    getAll: () => ipcRenderer.invoke(IPC_CHANNELS.GROUPS_GET_ALL),
+    create: (data: Partial<Group>) => ipcRenderer.invoke(IPC_CHANNELS.GROUPS_CREATE, data),
+    update: (id: string, data: Partial<Group>) => ipcRenderer.invoke(IPC_CHANNELS.GROUPS_UPDATE, id, data),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.GROUPS_DELETE, id),
+  },
+  cookies: {
+    read: (profileId: string, format: CookieFormat): Promise<CookieReadResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COOKIES_READ, profileId, format),
+    write: (profileId: string, format: CookieFormat, content: string): Promise<CookieWriteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COOKIES_WRITE, profileId, format, content),
+    clear: (profileId: string): Promise<CookieWriteResult> => ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId)
   },
   onProfileStatusChange: (callback: (state: ProfileRuntimeState) => void) => {
     const handler = (_event: any, state: ProfileRuntimeState) => callback(state)

@@ -61,6 +61,14 @@ export function initDatabase(): void {
     database.prepare('INSERT INTO schema_history (version, name) VALUES (?, ?)').run(version, name)
   })
 
+  const markMigrationApplied = (version: number, name: string) => {
+    database.prepare('INSERT INTO schema_history (version, name) VALUES (?, ?)').run(version, name)
+  }
+
+  const isDuplicateColumnError = (error: unknown): boolean => {
+    return error instanceof Error && /duplicate column name/i.test(error.message)
+  }
+
   for (const file of files) {
     const versionMatch = file.match(/^V(\d+)__(.+)\.sql$/)
     if (!versionMatch) continue
@@ -75,6 +83,12 @@ export function initDatabase(): void {
       try {
         runMigration(version, name, sql)
       } catch (err) {
+        if (isDuplicateColumnError(err)) {
+          console.warn(`Migration ${file} skipped because column already exists. Marking as applied.`)
+          markMigrationApplied(version, name)
+          continue
+        }
+
         console.error(`Failed to apply migration ${file}:`, err)
         throw err
       }

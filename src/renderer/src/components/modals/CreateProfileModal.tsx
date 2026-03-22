@@ -1,17 +1,58 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import type { Profile } from '@shared/types'
+
+const COMMON_USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.6312.122 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.111 Safari/537.36'
+]
+
+const TIMEZONE_OPTIONS = [
+  'UTC',
+  'America/New_York',
+  'Europe/London',
+  'Europe/Berlin',
+  'Asia/Ho_Chi_Minh',
+  'Asia/Singapore',
+  'Asia/Tokyo'
+]
+
+export interface CreateProfileFormData {
+  id?: string
+  name: string
+  browserCore?: string
+  proxyId?: string
+  userAgent?: string
+  timezone?: string
+  tags?: string
+  note?: string
+}
 
 interface CreateProfileModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly onSubmit?: (data: Record<string, string>) => void
+  readonly initialProfile?: Profile | null
+  readonly onSubmit?: (data: CreateProfileFormData) => Promise<void> | void
 }
 
 export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
   isOpen,
   onClose,
+  initialProfile,
   onSubmit,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const isEditing = Boolean(initialProfile?.id)
+  const [userAgent, setUserAgent] = useState('')
+  const [timezone, setTimezone] = useState('UTC')
+
+  useEffect(() => {
+    if (!isOpen) return
+    setUserAgent(initialProfile?.userAgent ?? '')
+    setTimezone(initialProfile?.timezone ?? 'UTC')
+  }, [isOpen, initialProfile])
+
+  const defaultTags = useMemo(() => initialProfile?.tags?.join(', ') ?? '', [initialProfile])
 
   useEffect(() => {
     if (!isOpen) return
@@ -31,9 +72,16 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const form = e.currentTarget
-    const data = Object.fromEntries(new FormData(form)) as Record<string, string>
-    onSubmit?.(data)
-    onClose()
+    const data = Object.fromEntries(new FormData(form)) as unknown as CreateProfileFormData
+    if (initialProfile?.id) {
+      data.id = initialProfile.id
+    }
+
+    Promise.resolve(onSubmit?.(data))
+      .then(() => onClose())
+      .catch((error) => {
+        console.error('Failed to create profile from modal:', error)
+      })
   }
 
   return (
@@ -55,7 +103,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
           <div>
             <h2 className="text-lg font-bold text-on-surface">Create New Profile</h2>
             <p className="text-on-surface-variant text-xs mt-0.5">
-              Configure a new isolated browser identity
+              {isEditing ? 'Update profile configuration' : 'Configure a new isolated browser identity'}
             </p>
           </div>
           <button
@@ -80,6 +128,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
                 name="name"
                 type="text"
                 placeholder="e.g. FB_Account_01"
+                defaultValue={initialProfile?.name ?? ''}
                 required
                 className="w-full bg-surface-container-highest border border-outline-variant/30 
                   rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant
@@ -111,6 +160,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
               </label>
               <select
                 name="proxyId"
+                defaultValue={initialProfile?.proxyId ?? ''}
                 className="w-full bg-surface-container-highest border border-outline-variant/30 
                   rounded px-4 py-2.5 text-sm text-on-surface 
                   focus:outline-none focus:ring-1 focus:ring-primary transition-all"
@@ -131,6 +181,8 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
                 <input
                   name="userAgent"
                   type="text"
+                  value={userAgent}
+                  onChange={(event) => setUserAgent(event.target.value)}
                   placeholder="Auto-generate from fingerprint seed..."
                   className="flex-1 bg-surface-container-highest border border-outline-variant/30 
                     rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant
@@ -138,6 +190,10 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
                 />
                 <button
                   type="button"
+                  onClick={() => {
+                    const next = COMMON_USER_AGENTS[Math.floor(Math.random() * COMMON_USER_AGENTS.length)]
+                    setUserAgent(next)
+                  }}
                   className="btn-secondary text-sm flex items-center gap-1.5 shrink-0"
                 >
                   <span className="material-symbols-outlined text-[16px]">shuffle</span>
@@ -151,14 +207,20 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
               <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">
                 Timezone
               </label>
-              <input
+              <select
                 name="timezone"
-                type="text"
-                placeholder="e.g. Asia/Ho_Chi_Minh (auto from proxy)"
+                value={timezone}
+                onChange={(event) => setTimezone(event.target.value)}
                 className="w-full bg-surface-container-highest border border-outline-variant/30 
                   rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant
                   focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-              />
+              >
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Tags */}
@@ -169,6 +231,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
               <input
                 name="tags"
                 type="text"
+                defaultValue={defaultTags}
                 placeholder="facebook, shopee, ads (comma-separated)"
                 className="w-full bg-surface-container-highest border border-outline-variant/30 
                   rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant
@@ -184,6 +247,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
               <textarea
                 name="note"
                 rows={3}
+                defaultValue={initialProfile?.note ?? ''}
                 placeholder="Optional notes about this profile..."
                 className="w-full bg-surface-container-highest border border-outline-variant/30 
                   rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant resize-none
@@ -202,7 +266,7 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
               Cancel
             </button>
             <button type="submit" className="btn-primary text-sm px-6">
-              Create Profile
+              {isEditing ? 'Save Changes' : 'Create Profile'}
             </button>
           </div>
         </form>

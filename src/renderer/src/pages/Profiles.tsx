@@ -1,16 +1,21 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Profile } from '@shared/types'
-import { DASHBOARD_STATS, SAMPLE_PROFILES } from '@renderer/data/mockData'
 import { ProfileRow } from '@renderer/components/profiles/ProfileRow'
 import { useDashboard } from '@renderer/hooks/useDashboard'
 
 interface ProfilesProps {
   readonly onCreateProfile?: () => void
+  readonly onEditProfile?: (profile: Profile) => void
 }
 
-export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
+export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfile }) => {
+  const [bulkAction, setBulkAction] = React.useState<'open' | 'close' | 'assignProxy'>('open')
+
   const {
     profiles,
+    allProfiles,
+    isLoading,
+    error,
     selectedIds,
     searchQuery,
     setSearchQuery,
@@ -19,10 +24,71 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
     handleLaunch,
     handleStop,
     handleDelete,
-  } = useDashboard(SAMPLE_PROFILES)
+    handleBulkOpen,
+    handleBulkClose,
+    handleBulkAssignProxy,
+    clearSelection,
+  } = useDashboard()
+
+  const selectedProfileIds = React.useMemo(() => Array.from(selectedIds), [selectedIds])
 
   const allSelected = selectedIds.size === profiles.length && profiles.length > 0
   const someSelected = selectedIds.size > 0 && !allSelected
+
+  const stats = [
+    { label: 'Profiles', value: allProfiles.length.toString(), icon: 'person_pin' },
+    {
+      label: 'Active',
+      value: allProfiles.filter((profile) => profile.status === 'running').length.toString(),
+      icon: 'play_circle',
+      isActive: true
+    },
+    {
+      label: 'With Proxy',
+      value: allProfiles.filter((profile) => Boolean(profile.proxyId)).length.toString(),
+      icon: 'vpn_lock'
+    },
+    {
+      label: 'Selected',
+      value: selectedIds.size.toString(),
+      icon: 'check_box'
+    }
+  ]
+
+  const runProfileAction = async (action: () => Promise<void>) => {
+    try {
+      await action()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Profile action failed.'
+      console.error(message)
+      window.alert(message)
+    }
+  }
+
+  const runBulkAction = async () => {
+    if (selectedProfileIds.length === 0) {
+      window.alert('Select at least one profile before running a bulk action.')
+      return
+    }
+
+    await runProfileAction(async () => {
+      if (bulkAction === 'open') {
+        await handleBulkOpen(selectedProfileIds)
+      } else if (bulkAction === 'close') {
+        await handleBulkClose(selectedProfileIds)
+      } else {
+        const input = window.prompt('Enter proxy id to assign (leave empty to clear proxy):', '')
+        if (input === null) {
+          return
+        }
+
+        const proxyId = input.trim() || undefined
+        await handleBulkAssignProxy(selectedProfileIds, proxyId)
+      }
+
+      clearSelection()
+    })
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -45,7 +111,7 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
 
         {/* Stat cards */}
         <div className="flex gap-4">
-          {DASHBOARD_STATS.map((stat) => (
+          {stats.map((stat) => (
             <div
               key={stat.label}
               className="bg-surface-container-high border border-outline-variant/20 
@@ -84,10 +150,23 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
               <span className="material-symbols-outlined text-[18px]">upload_file</span>
               Import
             </button>
-            <div className="relative">
-              <button className="btn-secondary flex items-center gap-1.5 text-sm">
-                Bulk Action
-                <span className="material-symbols-outlined text-[18px]">expand_more</span>
+            <div className="relative flex items-center gap-2">
+              <select
+                value={bulkAction}
+                onChange={(e) => setBulkAction(e.target.value as 'open' | 'close' | 'assignProxy')}
+                className="btn-secondary text-sm h-[36px] pr-8"
+              >
+                <option value="open">Bulk Open</option>
+                <option value="close">Bulk Close</option>
+                <option value="assignProxy">Bulk Proxy Assign</option>
+              </select>
+              <button
+                onClick={() => {
+                  void runBulkAction()
+                }}
+                className="btn-secondary flex items-center gap-1.5 text-sm"
+              >
+                Run ({selectedProfileIds.length})
               </button>
             </div>
           </div>
@@ -118,6 +197,12 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
 
         {/* Table */}
         <div className="bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/10 shadow-2xl">
+          {error && (
+            <div className="px-5 py-3 text-sm text-error border-b border-error/20 bg-error/5">
+              Failed to load profiles: {error}
+            </div>
+          )}
+
           <table className="w-full text-left border-collapse">
             <thead className="bg-surface-container-high/50">
               <tr>
@@ -143,16 +228,38 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
+              {isLoading && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-sm text-on-surface-variant">
+                    Loading profiles...
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && profiles.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="py-10 text-center text-sm text-on-surface-variant">
+                    No profiles found. Create your first profile to get started.
+                  </td>
+                </tr>
+              )}
+
               {profiles.map((profile) => (
                 <ProfileRow
                   key={profile.id}
                   profile={profile}
                   isSelected={selectedIds.has(profile.id)}
                   onSelect={handleSelect}
-                  onLaunch={handleLaunch}
-                  onStop={handleStop}
-                  onEdit={() => {}}
-                  onDelete={handleDelete}
+                  onLaunch={(id) => {
+                    void runProfileAction(() => handleLaunch(id))
+                  }}
+                  onStop={(id) => {
+                    void runProfileAction(() => handleStop(id))
+                  }}
+                  onEdit={(profile) => onEditProfile?.(profile)}
+                  onDelete={(id) => {
+                    void runProfileAction(() => handleDelete(id))
+                  }}
                 />
               ))}
             </tbody>
@@ -161,7 +268,7 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile }) => {
 
         {/* Pagination */}
         <div className="mt-5 flex items-center justify-between text-xs text-on-surface-variant">
-          <p>Showing 1–{profiles.length} of 128 profiles</p>
+          <p>Showing 1-{profiles.length} of {allProfiles.length} profiles</p>
           <div className="flex items-center gap-1.5">
             <button className="p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors">
               <span className="material-symbols-outlined text-[18px]">chevron_left</span>

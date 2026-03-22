@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDatabase } from './database/db'
+import { ensureChromiumBinary } from './browser/browserManager'
 import { setupIpcHandlers } from './ipc'
 
 function createWindow(): void {
@@ -38,11 +39,18 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.anti-detech')
 
   // Initialize SQLite Database
   initDatabase()
+
+  try {
+    const chromium = await ensureChromiumBinary()
+    console.log(`Chromium binary ready (${chromium.source}): ${chromium.path}`)
+  } catch (error) {
+    console.warn('Chromium binary is not ready. Browser launch features will remain unavailable until configured.', error)
+  }
 
   // Setup IPC Bridge Handlers
   setupIpcHandlers()

@@ -8527,86 +8527,6 @@ const Header = ({ onCreateProfile }) => {
     }
   );
 };
-const DASHBOARD_STATS = [
-  { label: "Profiles", value: "128", icon: "person_pin" },
-  { label: "Active", value: "36", icon: "play_circle", isActive: true },
-  { label: "Proxies", value: "54", icon: "vpn_lock" },
-  { label: "Automations", value: "8", icon: "auto_mode" }
-];
-const SAMPLE_PROFILES = [
-  {
-    id: "p1",
-    name: "FB_Shop_Account_01",
-    fingerprintSeed: 73461,
-    isPinned: false,
-    createdAt: "2026-01-01",
-    lastOpened: "2 min ago",
-    status: "running",
-    proxyId: "proxy-us",
-    tags: ["facebook"],
-    timezone: "America/New_York"
-  },
-  {
-    id: "p2",
-    name: "ShopeeVN_Seller_02",
-    fingerprintSeed: 24812,
-    isPinned: false,
-    createdAt: "2026-01-02",
-    lastOpened: "1 hour ago",
-    status: "idle",
-    proxyId: "proxy-vn",
-    tags: ["shopee"],
-    timezone: "Asia/Ho_Chi_Minh"
-  },
-  {
-    id: "p3",
-    name: "Ads_Master_UK_01",
-    fingerprintSeed: 98201,
-    isPinned: false,
-    createdAt: "2026-01-03",
-    lastOpened: "4 hours ago",
-    status: "idle",
-    proxyId: "proxy-uk",
-    tags: ["google-ads"],
-    timezone: "Europe/London"
-  },
-  {
-    id: "p4",
-    name: "Amazon_Review_Gen_04",
-    fingerprintSeed: 11223,
-    isPinned: false,
-    createdAt: "2026-01-04",
-    lastOpened: "Just now",
-    status: "running",
-    proxyId: "proxy-de",
-    tags: ["amazon"],
-    timezone: "Europe/Berlin"
-  },
-  {
-    id: "p5",
-    name: "Tiktok_Proxy_01",
-    fingerprintSeed: 55678,
-    isPinned: false,
-    createdAt: "2026-01-05",
-    lastOpened: "Yesterday",
-    status: "idle",
-    proxyId: "proxy-br",
-    tags: ["tiktok"],
-    timezone: "America/Sao_Paulo"
-  },
-  {
-    id: "p6",
-    name: "Etsy_Shop_Account_09",
-    fingerprintSeed: 33091,
-    isPinned: false,
-    createdAt: "2026-01-06",
-    lastOpened: "2 days ago",
-    status: "idle",
-    proxyId: "proxy-fr",
-    tags: ["etsy"],
-    timezone: "Europe/Paris"
-  }
-];
 const NAV_ITEMS = [
   { label: "Dashboard", icon: "dashboard", path: "/" },
   { label: "Profiles", icon: "person_pin", path: "/profiles" },
@@ -8660,6 +8580,209 @@ const Sidebar = ({ className = "" }) => {
       ]
     }
   );
+};
+const useDashboard = () => {
+  const [profiles, setProfiles] = reactExports.useState([]);
+  const [selectedIds, setSelectedIds] = reactExports.useState(/* @__PURE__ */ new Set());
+  const [searchQuery, setSearchQuery] = reactExports.useState("");
+  const [isLoading, setIsLoading] = reactExports.useState(true);
+  const [error, setError] = reactExports.useState(null);
+  const loadProfiles = reactExports.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetched = await window.api.profiles.getAll();
+      setProfiles(fetched);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch profiles.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+  reactExports.useEffect(() => {
+    const onProfilesChanged = () => {
+      void loadProfiles();
+    };
+    const unsubscribeStatus = window.api.onProfileStatusChange((state) => {
+      setProfiles(
+        (prev) => prev.map(
+          (profile) => profile.id === state.profileId ? {
+            ...profile,
+            status: state.status
+          } : profile
+        )
+      );
+      if (state.status === "error" && state.error) {
+        setError(state.error);
+      }
+    });
+    void loadProfiles();
+    window.addEventListener("profiles:changed", onProfilesChanged);
+    return () => {
+      window.removeEventListener("profiles:changed", onProfilesChanged);
+      unsubscribeStatus();
+    };
+  }, [loadProfiles]);
+  const filteredProfiles = reactExports.useMemo(
+    () => searchQuery.trim() ? profiles.filter(
+      (p2) => p2.name.toLowerCase().includes(searchQuery.toLowerCase()) || p2.tags?.some((t2) => t2.toLowerCase().includes(searchQuery.toLowerCase()))
+    ) : profiles,
+    [profiles, searchQuery]
+  );
+  const handleSelect = reactExports.useCallback((id2, checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id2);
+      else next.delete(id2);
+      return next;
+    });
+  }, []);
+  const handleSelectAll = reactExports.useCallback(
+    (checked) => {
+      setSelectedIds(checked ? new Set(filteredProfiles.map((p2) => p2.id)) : /* @__PURE__ */ new Set());
+    },
+    [filteredProfiles]
+  );
+  const handleLaunch = reactExports.useCallback(async (id2) => {
+    const result = await window.api.profiles.start([id2]);
+    if (!result.success) {
+      const launchErrors = result.errors?.join(", ") ?? "Unknown launch error.";
+      throw new Error(launchErrors);
+    }
+    setProfiles((prev) => {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      return prev.map((p2) => p2.id === id2 ? { ...p2, status: "running", lastOpened: now } : p2);
+    });
+  }, []);
+  const handleStop = reactExports.useCallback(async (id2) => {
+    const result = await window.api.profiles.stop([id2]);
+    if (!result.success) {
+      const stopErrors = result.errors?.join(", ") ?? "Unknown stop error.";
+      throw new Error(stopErrors);
+    }
+    setProfiles((prev) => prev.map((p2) => p2.id === id2 ? { ...p2, status: "idle" } : p2));
+  }, []);
+  const handleDelete = reactExports.useCallback(async (id2) => {
+    await window.api.profiles.delete(id2);
+    setProfiles((prev) => prev.filter((p2) => p2.id !== id2));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id2);
+      return next;
+    });
+  }, []);
+  const handleBulkOpen = reactExports.useCallback(async (profileIds) => {
+    const result = await window.api.profiles.bulkOpen(profileIds);
+    if (!result.success) {
+      throw new Error(result.errors?.join(", ") ?? "Bulk open failed.");
+    }
+  }, []);
+  const handleBulkClose = reactExports.useCallback(async (profileIds) => {
+    const result = await window.api.profiles.bulkClose(profileIds);
+    if (!result.success) {
+      throw new Error(result.errors?.join(", ") ?? "Bulk close failed.");
+    }
+  }, []);
+  const handleBulkAssignProxy = reactExports.useCallback(async (profileIds, proxyId) => {
+    const result = await window.api.profiles.bulkAssignProxy(profileIds, proxyId);
+    if (!result.success) {
+      throw new Error(result.errors?.join(", ") ?? "Bulk proxy assign failed.");
+    }
+    setProfiles((prev) => prev.map((profile) => profileIds.includes(profile.id) ? { ...profile, proxyId } : profile));
+  }, []);
+  const clearSelection = reactExports.useCallback(() => {
+    setSelectedIds(/* @__PURE__ */ new Set());
+  }, []);
+  return {
+    profiles: filteredProfiles,
+    allProfiles: profiles,
+    isLoading,
+    error,
+    selectedIds,
+    searchQuery,
+    setSearchQuery,
+    refreshProfiles: loadProfiles,
+    handleSelect,
+    handleSelectAll,
+    handleLaunch,
+    handleStop,
+    handleDelete,
+    handleBulkOpen,
+    handleBulkClose,
+    handleBulkAssignProxy,
+    clearSelection
+  };
+};
+const Dashboard = () => {
+  const { profiles, isLoading, error, handleLaunch, handleStop } = useDashboard();
+  const runningCount = profiles.filter((profile) => profile.status === "running").length;
+  const idleCount = profiles.filter((profile) => profile.status === "idle").length;
+  const runProfileAction = async (action) => {
+    try {
+      await action();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Profile action failed.";
+      console.error(message);
+      window.alert(message);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 max-w-[1200px] mx-auto h-full flex flex-col gap-6", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container p-5 rounded-xl border border-outline-variant/20", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-widest text-on-surface-variant", children: "Total Profiles" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-3xl font-black text-on-surface mt-2", children: profiles.length })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container p-5 rounded-xl border border-outline-variant/20", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-widest text-on-surface-variant", children: "Running" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-3xl font-black text-tertiary mt-2", children: runningCount })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container p-5 rounded-xl border border-outline-variant/20", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-widest text-on-surface-variant", children: "Closed" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-3xl font-black text-on-surface mt-2", children: idleCount })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("section", { className: "bg-surface-container-low rounded-xl border border-outline-variant/10 overflow-hidden flex-1", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-5 py-4 border-b border-outline-variant/10", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold text-on-surface", children: "Runtime Status" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-on-surface-variant", children: "Start/stop profiles and monitor real-time state updates." })
+      ] }),
+      error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mx-5 mt-4 px-4 py-3 text-sm text-error rounded-lg border border-error/30 bg-error/10", children: error }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "overflow-auto max-h-[520px]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-left border-collapse", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-surface-container-high/50", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-xs uppercase tracking-widest text-on-surface-variant", children: "Profile" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-xs uppercase tracking-widest text-on-surface-variant", children: "Status" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-xs uppercase tracking-widest text-on-surface-variant", children: "Last Opened" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-xs uppercase tracking-widest text-on-surface-variant text-right", children: "Action" })
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("tbody", { className: "divide-y divide-white/[0.05]", children: [
+          isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 4, className: "px-5 py-8 text-center text-on-surface-variant", children: "Loading profiles..." }) }),
+          !isLoading && profiles.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 4, className: "px-5 py-8 text-center text-on-surface-variant", children: "No profiles yet." }) }),
+          profiles.map((profile) => {
+            const isRunning = profile.status === "running";
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/40 transition-colors", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-4 text-sm font-semibold text-on-surface", children: profile.name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: isRunning ? "status-dot-active animate-pulse" : "status-dot-idle" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-xs font-semibold ${isRunning ? "text-tertiary" : "text-on-surface-variant"}`, children: isRunning ? "Running" : "Closed" })
+              ] }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-4 text-xs text-on-surface-variant", children: profile.lastOpened ?? "—" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-4 text-right", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: () => {
+                    void runProfileAction(() => isRunning ? handleStop(profile.id) : handleLaunch(profile.id));
+                  },
+                  className: `text-xs font-bold px-3 py-1 rounded transition-opacity hover:opacity-80 ${isRunning ? "bg-error text-white" : "btn-primary"}`,
+                  children: isRunning ? "Stop" : "Start"
+                }
+              ) })
+            ] }, profile.id);
+          })
+        ] })
+      ] }) })
+    ] })
+  ] });
 };
 const ProfileRow = ({
   profile,
@@ -8750,61 +8873,13 @@ const ProfileRow = ({
     }
   );
 };
-const useDashboard = (initialProfiles) => {
-  const [profiles, setProfiles] = reactExports.useState(initialProfiles);
-  const [selectedIds, setSelectedIds] = reactExports.useState(/* @__PURE__ */ new Set());
-  const [searchQuery, setSearchQuery] = reactExports.useState("");
-  const filteredProfiles = reactExports.useMemo(
-    () => searchQuery.trim() ? profiles.filter(
-      (p2) => p2.name.toLowerCase().includes(searchQuery.toLowerCase()) || p2.tags?.some((t2) => t2.toLowerCase().includes(searchQuery.toLowerCase()))
-    ) : profiles,
-    [profiles, searchQuery]
-  );
-  const handleSelect = reactExports.useCallback((id2, checked) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id2);
-      else next.delete(id2);
-      return next;
-    });
-  }, []);
-  const handleSelectAll = reactExports.useCallback(
-    (checked) => {
-      setSelectedIds(checked ? new Set(filteredProfiles.map((p2) => p2.id)) : /* @__PURE__ */ new Set());
-    },
-    [filteredProfiles]
-  );
-  const handleLaunch = reactExports.useCallback((id2) => {
-    setProfiles(
-      (prev) => prev.map((p2) => p2.id === id2 ? { ...p2, status: "running", lastOpened: "Just now" } : p2)
-    );
-  }, []);
-  const handleStop = reactExports.useCallback((id2) => {
-    setProfiles((prev) => prev.map((p2) => p2.id === id2 ? { ...p2, status: "idle" } : p2));
-  }, []);
-  const handleDelete = reactExports.useCallback((id2) => {
-    setProfiles((prev) => prev.filter((p2) => p2.id !== id2));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id2);
-      return next;
-    });
-  }, []);
-  return {
-    profiles: filteredProfiles,
-    selectedIds,
-    searchQuery,
-    setSearchQuery,
-    handleSelect,
-    handleSelectAll,
-    handleLaunch,
-    handleStop,
-    handleDelete
-  };
-};
-const Dashboard = ({ onCreateProfile }) => {
+const Profiles = ({ onCreateProfile, onEditProfile }) => {
+  const [bulkAction, setBulkAction] = React.useState("open");
   const {
     profiles,
+    allProfiles,
+    isLoading,
+    error,
     selectedIds,
     searchQuery,
     setSearchQuery,
@@ -8812,10 +8887,64 @@ const Dashboard = ({ onCreateProfile }) => {
     handleSelectAll,
     handleLaunch,
     handleStop,
-    handleDelete
-  } = useDashboard(SAMPLE_PROFILES);
+    handleDelete,
+    handleBulkOpen,
+    handleBulkClose,
+    handleBulkAssignProxy,
+    clearSelection
+  } = useDashboard();
+  const selectedProfileIds = React.useMemo(() => Array.from(selectedIds), [selectedIds]);
   const allSelected = selectedIds.size === profiles.length && profiles.length > 0;
   const someSelected = selectedIds.size > 0 && !allSelected;
+  const stats = [
+    { label: "Profiles", value: allProfiles.length.toString(), icon: "person_pin" },
+    {
+      label: "Active",
+      value: allProfiles.filter((profile) => profile.status === "running").length.toString(),
+      icon: "play_circle",
+      isActive: true
+    },
+    {
+      label: "With Proxy",
+      value: allProfiles.filter((profile) => Boolean(profile.proxyId)).length.toString(),
+      icon: "vpn_lock"
+    },
+    {
+      label: "Selected",
+      value: selectedIds.size.toString(),
+      icon: "check_box"
+    }
+  ];
+  const runProfileAction = async (action) => {
+    try {
+      await action();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Profile action failed.";
+      console.error(message);
+      window.alert(message);
+    }
+  };
+  const runBulkAction = async () => {
+    if (selectedProfileIds.length === 0) {
+      window.alert("Select at least one profile before running a bulk action.");
+      return;
+    }
+    await runProfileAction(async () => {
+      if (bulkAction === "open") {
+        await handleBulkOpen(selectedProfileIds);
+      } else if (bulkAction === "close") {
+        await handleBulkClose(selectedProfileIds);
+      } else {
+        const input = window.prompt("Enter proxy id to assign (leave empty to clear proxy):", "");
+        if (input === null) {
+          return;
+        }
+        const proxyId = input.trim() || void 0;
+        await handleBulkAssignProxy(selectedProfileIds, proxyId);
+      }
+      clearSelection();
+    });
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "section",
@@ -8828,7 +8957,7 @@ const Dashboard = ({ onCreateProfile }) => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold text-on-surface leading-tight", children: "Manage your anonymous browser profiles securely" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-on-surface-variant text-sm mt-1", children: "Anti-fingerprint browser profiles with proxy, cookie and automation control" })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-4", children: DASHBOARD_STATS.map((stat) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex gap-4", children: stats.map((stat) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
             "div",
             {
               className: "bg-surface-container-high border border-outline-variant/20 \n                px-5 py-4 rounded-lg min-w-[130px] relative overflow-hidden",
@@ -8865,10 +8994,35 @@ const Dashboard = ({ onCreateProfile }) => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "upload_file" }),
             "Import"
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "relative", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary flex items-center gap-1.5 text-sm", children: [
-            "Bulk Action",
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "expand_more" })
-          ] }) })
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "select",
+              {
+                value: bulkAction,
+                onChange: (e) => setBulkAction(e.target.value),
+                className: "btn-secondary text-sm h-[36px] pr-8",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "open", children: "Bulk Open" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "close", children: "Bulk Close" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "assignProxy", children: "Bulk Proxy Assign" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                onClick: () => {
+                  void runBulkAction();
+                },
+                className: "btn-secondary flex items-center gap-1.5 text-sm",
+                children: [
+                  "Run (",
+                  selectedProfileIds.length,
+                  ")"
+                ]
+              }
+            )
+          ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
@@ -8888,49 +9042,66 @@ const Dashboard = ({ onCreateProfile }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary p-2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[20px]", children: "sort" }) })
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/10 shadow-2xl", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-left border-collapse", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-surface-container-high/50", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "py-3.5 px-5 w-10", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "checkbox",
-              checked: allSelected,
-              ref: (el2) => {
-                if (el2) el2.indeterminate = someSelected;
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/10 shadow-2xl", children: [
+        error && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-5 py-3 text-sm text-error border-b border-error/20 bg-error/5", children: [
+          "Failed to load profiles: ",
+          error
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-left border-collapse", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-surface-container-high/50", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "py-3.5 px-5 w-10", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                type: "checkbox",
+                checked: allSelected,
+                ref: (el2) => {
+                  if (el2) el2.indeterminate = someSelected;
+                },
+                onChange: (e) => handleSelectAll(e.target.checked),
+                className: "rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface"
+              }
+            ) }),
+            ["Status", "Profile Name", "Browser", "Proxy", "Fingerprint", "Tags", "Last Used", "Actions"].map((col) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "th",
+              {
+                className: `py-3.5 px-4 text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest ${col === "Actions" ? "text-right pr-5" : ""}`,
+                children: col
               },
-              onChange: (e) => handleSelectAll(e.target.checked),
-              className: "rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface"
-            }
-          ) }),
-          ["Status", "Profile Name", "Browser", "Proxy", "Fingerprint", "Tags", "Last Used", "Actions"].map((col) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "th",
-            {
-              className: `py-3.5 px-4 text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest ${col === "Actions" ? "text-right pr-5" : ""}`,
-              children: col
-            },
-            col
-          ))
-        ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { className: "divide-y divide-white/[0.04]", children: profiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          ProfileRow,
-          {
-            profile,
-            isSelected: selectedIds.has(profile.id),
-            onSelect: handleSelect,
-            onLaunch: handleLaunch,
-            onStop: handleStop,
-            onEdit: () => {
-            },
-            onDelete: handleDelete
-          },
-          profile.id
-        )) })
-      ] }) }),
+              col
+            ))
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("tbody", { className: "divide-y divide-white/[0.04]", children: [
+            isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 9, className: "py-10 text-center text-sm text-on-surface-variant", children: "Loading profiles..." }) }),
+            !isLoading && profiles.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 9, className: "py-10 text-center text-sm text-on-surface-variant", children: "No profiles found. Create your first profile to get started." }) }),
+            profiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              ProfileRow,
+              {
+                profile,
+                isSelected: selectedIds.has(profile.id),
+                onSelect: handleSelect,
+                onLaunch: (id2) => {
+                  void runProfileAction(() => handleLaunch(id2));
+                },
+                onStop: (id2) => {
+                  void runProfileAction(() => handleStop(id2));
+                },
+                onEdit: (profile2) => onEditProfile?.(profile2),
+                onDelete: (id2) => {
+                  void runProfileAction(() => handleDelete(id2));
+                }
+              },
+              profile.id
+            ))
+          ] })
+        ] })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-5 flex items-center justify-between text-xs text-on-surface-variant", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { children: [
-          "Showing 1–",
+          "Showing 1-",
           profiles.length,
-          " of 128 profiles"
+          " of ",
+          allProfiles.length,
+          " profiles"
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "chevron_left" }) }),
@@ -9346,12 +9517,36 @@ const Settings = () => {
     ] })
   ] });
 };
+const COMMON_USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.6312.122 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.111 Safari/537.36"
+];
+const TIMEZONE_OPTIONS = [
+  "UTC",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Ho_Chi_Minh",
+  "Asia/Singapore",
+  "Asia/Tokyo"
+];
 const CreateProfileModal = ({
   isOpen,
   onClose,
+  initialProfile,
   onSubmit
 }) => {
   const overlayRef = reactExports.useRef(null);
+  const isEditing = Boolean(initialProfile?.id);
+  const [userAgent, setUserAgent] = reactExports.useState("");
+  const [timezone, setTimezone] = reactExports.useState("UTC");
+  reactExports.useEffect(() => {
+    if (!isOpen) return;
+    setUserAgent(initialProfile?.userAgent ?? "");
+    setTimezone(initialProfile?.timezone ?? "UTC");
+  }, [isOpen, initialProfile]);
+  const defaultTags = reactExports.useMemo(() => initialProfile?.tags?.join(", ") ?? "", [initialProfile]);
   reactExports.useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e) => {
@@ -9368,8 +9563,12 @@ const CreateProfileModal = ({
     e.preventDefault();
     const form = e.currentTarget;
     const data = Object.fromEntries(new FormData(form));
-    onSubmit?.(data);
-    onClose();
+    if (initialProfile?.id) {
+      data.id = initialProfile.id;
+    }
+    Promise.resolve(onSubmit?.(data)).then(() => onClose()).catch((error) => {
+      console.error("Failed to create profile from modal:", error);
+    });
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsx(
     "div",
@@ -9388,7 +9587,7 @@ const CreateProfileModal = ({
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between px-8 py-5 border-b border-white/[0.05]", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold text-on-surface", children: "Create New Profile" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-on-surface-variant text-xs mt-0.5", children: "Configure a new isolated browser identity" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-on-surface-variant text-xs mt-0.5", children: isEditing ? "Update profile configuration" : "Configure a new isolated browser identity" })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsx(
                 "button",
@@ -9410,6 +9609,7 @@ const CreateProfileModal = ({
                       name: "name",
                       type: "text",
                       placeholder: "e.g. FB_Account_01",
+                      defaultValue: initialProfile?.name ?? "",
                       required: true,
                       className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary focus:shadow-glow transition-all"
                     }
@@ -9436,6 +9636,7 @@ const CreateProfileModal = ({
                     "select",
                     {
                       name: "proxyId",
+                      defaultValue: initialProfile?.proxyId ?? "",
                       className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface \n                  focus:outline-none focus:ring-1 focus:ring-primary transition-all",
                       children: [
                         /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "", children: "— No Proxy (Direct) —" }),
@@ -9454,6 +9655,8 @@ const CreateProfileModal = ({
                       {
                         name: "userAgent",
                         type: "text",
+                        value: userAgent,
+                        onChange: (event) => setUserAgent(event.target.value),
                         placeholder: "Auto-generate from fingerprint seed...",
                         className: "flex-1 bg-surface-container-highest border border-outline-variant/30 \n                    rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                    focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                       }
@@ -9462,6 +9665,10 @@ const CreateProfileModal = ({
                       "button",
                       {
                         type: "button",
+                        onClick: () => {
+                          const next = COMMON_USER_AGENTS[Math.floor(Math.random() * COMMON_USER_AGENTS.length)];
+                          setUserAgent(next);
+                        },
                         className: "btn-secondary text-sm flex items-center gap-1.5 shrink-0",
                         children: [
                           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "shuffle" }),
@@ -9474,12 +9681,13 @@ const CreateProfileModal = ({
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Timezone" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    "input",
+                    "select",
                     {
                       name: "timezone",
-                      type: "text",
-                      placeholder: "e.g. Asia/Ho_Chi_Minh (auto from proxy)",
-                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                      value: timezone,
+                      onChange: (event) => setTimezone(event.target.value),
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary transition-all",
+                      children: TIMEZONE_OPTIONS.map((tz) => /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: tz, children: tz }, tz))
                     }
                   )
                 ] }),
@@ -9490,6 +9698,7 @@ const CreateProfileModal = ({
                     {
                       name: "tags",
                       type: "text",
+                      defaultValue: defaultTags,
                       placeholder: "facebook, shopee, ads (comma-separated)",
                       className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                     }
@@ -9502,6 +9711,7 @@ const CreateProfileModal = ({
                     {
                       name: "note",
                       rows: 3,
+                      defaultValue: initialProfile?.note ?? "",
                       placeholder: "Optional notes about this profile...",
                       className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant resize-none\n                  focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                     }
@@ -9518,7 +9728,7 @@ const CreateProfileModal = ({
                     children: "Cancel"
                   }
                 ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "submit", className: "btn-primary text-sm px-6", children: "Create Profile" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "submit", className: "btn-primary text-sm px-6", children: isEditing ? "Save Changes" : "Create Profile" })
               ] })
             ] })
           ]
@@ -9534,22 +9744,55 @@ const PlaceholderPage = ({ title, icon }) => /* @__PURE__ */ jsxRuntimeExports.j
 ] });
 const App = () => {
   const [isCreateModalOpen, setCreateModalOpen] = reactExports.useState(false);
+  const [editingProfile, setEditingProfile] = reactExports.useState(null);
+  const openCreateModal = () => {
+    setEditingProfile(null);
+    setCreateModalOpen(true);
+  };
+  const openEditModal = (profile) => {
+    setEditingProfile(profile);
+    setCreateModalOpen(true);
+  };
+  const handleCreateProfile = async (data) => {
+    const tags = data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : void 0;
+    if (data.id) {
+      await window.api.profiles.update(data.id, {
+        name: data.name,
+        proxyId: data.proxyId || void 0,
+        userAgent: data.userAgent || void 0,
+        timezone: data.timezone || void 0,
+        note: data.note || void 0,
+        tags
+      });
+    } else {
+      await window.api.profiles.create({
+        name: data.name,
+        proxyId: data.proxyId || void 0,
+        userAgent: data.userAgent || void 0,
+        timezone: data.timezone || void 0,
+        note: data.note || void 0,
+        tags
+      });
+    }
+    window.dispatchEvent(new Event("profiles:changed"));
+    setEditingProfile(null);
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-screen bg-surface overflow-hidden", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx(Header, { onCreateProfile: () => setCreateModalOpen(true) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(Header, { onCreateProfile: openCreateModal }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(Sidebar, {}),
     /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "ml-[240px] pt-[60px] flex-1 overflow-hidden bg-surface-container-low", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-full overflow-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(Routes, { children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Route,
         {
           path: "/",
-          element: /* @__PURE__ */ jsxRuntimeExports.jsx(Dashboard, { onCreateProfile: () => setCreateModalOpen(true) })
+          element: /* @__PURE__ */ jsxRuntimeExports.jsx(Dashboard, {})
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Route,
         {
           path: "/profiles",
-          element: /* @__PURE__ */ jsxRuntimeExports.jsx(PlaceholderPage, { title: "Profiles", icon: "person_pin" })
+          element: /* @__PURE__ */ jsxRuntimeExports.jsx(Profiles, { onCreateProfile: openCreateModal, onEditProfile: openEditModal })
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -9599,8 +9842,12 @@ const App = () => {
       CreateProfileModal,
       {
         isOpen: isCreateModalOpen,
-        onClose: () => setCreateModalOpen(false),
-        onSubmit: (data) => console.log("Create profile:", data)
+        onClose: () => {
+          setCreateModalOpen(false);
+          setEditingProfile(null);
+        },
+        initialProfile: editingProfile,
+        onSubmit: handleCreateProfile
       }
     )
   ] }) });
