@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { Profile } from '@shared/types'
+import { handleIpcError } from '@renderer/utils/errorHandler'
 
 const COMMON_USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -80,7 +81,12 @@ export const CreateProfileModal: React.FC<CreateProfileModalProps> = ({
     Promise.resolve(onSubmit?.(data))
       .then(() => onClose())
       .catch((error) => {
-        console.error('Failed to create profile from modal:', error)
+        handleIpcError(error, {
+          title: 'Profile save failed',
+          fallbackMessage: 'Unable to save profile.',
+          context: 'modal.profileSubmit',
+          silent: true
+        })
       })
   }
 

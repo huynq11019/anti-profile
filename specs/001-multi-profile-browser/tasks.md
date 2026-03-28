@@ -187,7 +187,7 @@ description: "Task list template for feature implementation"
 **Purpose**: Improvements that affect multiple user stories
 
 - [ ] T039 Clean up unused Tailwind classes and enforce full "Cyber Shield" design specs across all components
-- [ ] T040 Implement graceful error handling and alert toasts for IPC failures in `src/renderer/utils/errorHandler.ts`
+- [x] T040 Implement graceful error handling and alert toasts for IPC failures in `src/renderer/utils/errorHandler.ts`
 - [ ] T041 Map Hotkeys (e.g., CMD/CTRL + N for New Profile)
 - [ ] T042 Verify all database queries are optimal for large datasets (500+ rules)
 - [ ] T043 Package application using `electron-builder`

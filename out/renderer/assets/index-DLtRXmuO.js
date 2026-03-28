@@ -8533,8 +8533,8 @@ const NAV_ITEMS = [
   { label: "Proxy Manager", icon: "vpn_lock", path: "/proxy" },
   { label: "Automation", icon: "auto_mode", path: "/automation" },
   { label: "Cookies", icon: "cookie", path: "/cookies" },
+  { label: "Bookmarks", icon: "bookmarks", path: "/bookmarks" },
   { label: "Extensions", icon: "extension", path: "/extensions" },
-  { label: "Logs", icon: "terminal", path: "/logs" },
   { label: "Settings", icon: "settings", path: "/settings" }
 ];
 const PROXY_MAP = {
@@ -8672,6 +8672,31 @@ const useDashboard = () => {
       return next;
     });
   }, []);
+  const handleTogglePin = reactExports.useCallback(async (id2) => {
+    const target = profiles.find((profile) => profile.id === id2);
+    if (!target) {
+      throw new Error(`Profile not found: ${id2}`);
+    }
+    await window.api.profiles.update(id2, { isPinned: !target.isPinned });
+    await loadProfiles();
+  }, [loadProfiles, profiles]);
+  const handleOpenFolder = reactExports.useCallback(async (id2) => {
+    const result = await window.api.profiles.openFolder(id2);
+    if (!result.success) {
+      throw new Error(result.error ?? "Failed to open profile folder.");
+    }
+  }, []);
+  const handleQuickUpdate = reactExports.useCallback(async (id2, updates) => {
+    const updated = await window.api.profiles.update(id2, updates);
+    setProfiles((prev) => prev.map((profile) => profile.id === id2 ? { ...profile, ...updated } : profile));
+  }, []);
+  const handleExportZip = reactExports.useCallback(async (id2) => {
+    const result = await window.api.profiles.exportZip(id2);
+    if (!result.success) {
+      throw new Error(result.error ?? "Failed to export profile ZIP.");
+    }
+    return result.path;
+  }, []);
   const handleBulkOpen = reactExports.useCallback(async (profileIds) => {
     const result = await window.api.profiles.bulkOpen(profileIds);
     if (!result.success) {
@@ -8691,6 +8716,17 @@ const useDashboard = () => {
     }
     setProfiles((prev) => prev.map((profile) => profileIds.includes(profile.id) ? { ...profile, proxyId } : profile));
   }, []);
+  const handleBulkAssignProxyMap = reactExports.useCallback(async (profileProxyMap) => {
+    const result = await window.api.profiles.bulkAssignProxyMap(profileProxyMap);
+    if (!result.success) {
+      throw new Error(result.errors?.join(", ") ?? "Bulk proxy map assign failed.");
+    }
+    setProfiles(
+      (prev) => prev.map(
+        (profile) => Object.prototype.hasOwnProperty.call(profileProxyMap, profile.id) ? { ...profile, proxyId: profileProxyMap[profile.id] } : profile
+      )
+    );
+  }, []);
   const clearSelection = reactExports.useCallback(() => {
     setSelectedIds(/* @__PURE__ */ new Set());
   }, []);
@@ -8708,9 +8744,14 @@ const useDashboard = () => {
     handleLaunch,
     handleStop,
     handleDelete,
+    handleTogglePin,
+    handleOpenFolder,
+    handleQuickUpdate,
+    handleExportZip,
     handleBulkOpen,
     handleBulkClose,
     handleBulkAssignProxy,
+    handleBulkAssignProxyMap,
     clearSelection
   };
 };
@@ -8790,16 +8831,67 @@ const ProfileRow = ({
   onSelect,
   onLaunch,
   onStop,
+  onTogglePin,
+  onOpenFolder,
+  onExportZip,
   onEdit,
   onDelete
 }) => {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [menuPosition, setMenuPosition] = React.useState({ x: 0, y: 0 });
+  const rowRef = React.useRef(null);
   const proxy = profile.proxyId ? PROXY_MAP[profile.proxyId] : null;
   const isRunning = profile.status === "running";
+  const closeMenu = React.useCallback(() => {
+    setMenuOpen(false);
+  }, []);
+  React.useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const onDocClick = (event) => {
+      const target = event.target;
+      if (rowRef.current && target && rowRef.current.contains(target)) {
+        return;
+      }
+      closeMenu();
+    };
+    const onEsc = (event) => {
+      if (event.key === "Escape") {
+        closeMenu();
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [menuOpen, closeMenu]);
+  const openMenuAt = (x2, y2) => {
+    setMenuPosition({ x: x2, y: y2 });
+    setMenuOpen(true);
+  };
+  const runMenuAction = (action) => {
+    action();
+    closeMenu();
+  };
+  const menuItems = [
+    { key: "edit", label: "Edit details", icon: "edit", action: () => onEdit(profile) },
+    { key: "pin", label: profile.isPinned ? "Unpin profile" : "Pin profile", icon: "push_pin", action: () => onTogglePin(profile.id) },
+    { key: "folder", label: "Open profile folder", icon: "folder_open", action: () => onOpenFolder(profile.id) },
+    { key: "zip", label: "Export profile ZIP", icon: "download", action: () => onExportZip(profile) },
+    { key: "delete", label: "Delete profile", icon: "delete", action: () => onDelete(profile.id), danger: true }
+  ];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(
     "tr",
     {
-      className: `table-row-hover border-l-2 border-transparent 
-        ${isSelected ? "bg-surface-bright border-l-primary" : ""}`,
+      ref: rowRef,
+      className: `table-row-hover border-l-2 border-transparent ${isSelected ? "bg-surface-bright border-l-primary" : ""}`,
+      onContextMenu: (event) => {
+        event.preventDefault();
+        openMenuAt(event.clientX, event.clientY);
+      },
       children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-5", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
           "input",
@@ -8807,20 +8899,17 @@ const ProfileRow = ({
             type: "checkbox",
             checked: isSelected,
             onChange: (e) => onSelect(profile.id, e.target.checked),
-            className: "rounded bg-surface border-outline-variant text-primary \n            focus:ring-primary focus:ring-offset-surface"
+            className: "rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface"
           }
         ) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: isRunning ? "status-dot-active animate-pulse" : "status-dot-idle" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "span",
-            {
-              className: `text-[11px] font-bold ${isRunning ? "text-tertiary" : "text-on-surface-variant"}`,
-              children: isRunning ? "Running" : "Idle"
-            }
-          )
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-[11px] font-bold ${isRunning ? "text-tertiary" : "text-on-surface-variant"}`, children: isRunning ? "Running" : "Idle" })
         ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4 font-semibold text-on-surface text-sm", children: profile.name }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4 font-semibold text-on-surface text-sm", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: profile.name }),
+          profile.isPinned && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[14px] text-primary", children: "push_pin" })
+        ] }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5 text-on-surface-variant", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "language" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs", children: "Chrome v114" })
@@ -8828,53 +8917,79 @@ const ProfileRow = ({
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4", children: proxy ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant rounded font-mono font-bold", children: proxy.country }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-mono text-on-surface-variant", children: proxy.ip })
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-on-surface-variant opacity-50", children: "— No Proxy —" }) }),
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-on-surface-variant opacity-50", children: "- No Proxy -" }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] font-mono text-outline", children: formatFingerprint(profile.fingerprintSeed) }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-1 flex-wrap", children: profile.tags?.map((tag) => /* @__PURE__ */ jsxRuntimeExports.jsx(
           "span",
           {
-            className: "text-[10px] px-2 py-0.5 bg-surface-container-highest \n                border border-outline-variant/30 rounded text-primary",
+            className: "text-[10px] px-2 py-0.5 bg-surface-container-highest border border-outline-variant/30 rounded text-primary",
             children: tag
           },
           tag
         )) }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4 text-xs text-on-surface-variant", children: profile.lastOpened ?? "—" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-5 text-right", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-end gap-1.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "py-3.5 px-4 text-xs text-on-surface-variant", children: profile.lastOpened ?? "-" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("td", { className: "py-3.5 px-5 text-right relative", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-end gap-1.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: () => isRunning ? onStop(profile.id) : onLaunch(profile.id),
+                className: `text-xs font-bold px-3 py-1 rounded transition-opacity hover:opacity-80 ${isRunning ? "bg-error text-white" : "btn-primary"}`,
+                id: `profile-action-${profile.id}`,
+                title: isRunning ? "Stop profile" : "Open profile",
+                children: isRunning ? "Stop" : "Start"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                onClick: (event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  openMenuAt(rect.right, rect.bottom + 6);
+                },
+                className: "p-1.5 text-on-surface-variant hover:text-on-surface transition-colors",
+                "aria-label": "Profile action menu",
+                title: "Action menu",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "more_vert" })
+              }
+            )
+          ] }),
+          menuOpen && /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "div",
             {
-              onClick: () => isRunning ? onStop(profile.id) : onLaunch(profile.id),
-              className: `text-xs font-bold px-3 py-1 rounded transition-opacity hover:opacity-80 
-              ${isRunning ? "bg-error text-white" : "btn-primary"}`,
-              id: `profile-action-${profile.id}`,
-              children: isRunning ? "Stop" : "Start"
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => onEdit(profile),
-              className: "p-1.5 text-on-surface-variant hover:text-on-surface transition-colors",
-              "aria-label": "Edit profile",
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "edit" })
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              onClick: () => onDelete(profile.id),
-              className: "p-1.5 text-on-surface-variant hover:text-error transition-colors",
-              "aria-label": "Delete profile",
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "delete" })
+              className: "fixed z-[120] w-[240px] rounded-lg border border-outline-variant/30 bg-surface-container-high shadow-2xl p-1",
+              style: { top: `${menuPosition.y}px`, left: `${menuPosition.x}px` },
+              role: "menu",
+              "aria-label": "Profile actions",
+              children: menuItems.map((item) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => runMenuAction(item.action),
+                  className: `w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 transition-colors ${item.danger ? "text-error hover:bg-error/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest"}`,
+                  role: "menuitem",
+                  title: item.label,
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: item.icon }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: item.label })
+                  ]
+                },
+                item.key
+              ))
             }
           )
-        ] }) })
+        ] })
       ]
     }
   );
 };
 const Profiles = ({ onCreateProfile, onEditProfile }) => {
   const [bulkAction, setBulkAction] = React.useState("open");
+  const [allProxies, setAllProxies] = React.useState([]);
+  const [showProxyMapModal, setShowProxyMapModal] = React.useState(false);
+  const [proxyMapDraft, setProxyMapDraft] = React.useState({});
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
   const {
     profiles,
     allProfiles,
@@ -8884,18 +8999,74 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
     searchQuery,
     setSearchQuery,
     handleSelect,
-    handleSelectAll,
     handleLaunch,
     handleStop,
     handleDelete,
+    handleTogglePin,
+    handleOpenFolder,
+    handleExportZip,
     handleBulkOpen,
     handleBulkClose,
     handleBulkAssignProxy,
+    handleBulkAssignProxyMap,
     clearSelection
   } = useDashboard();
   const selectedProfileIds = React.useMemo(() => Array.from(selectedIds), [selectedIds]);
-  const allSelected = selectedIds.size === profiles.length && profiles.length > 0;
-  const someSelected = selectedIds.size > 0 && !allSelected;
+  const selectedProfiles = React.useMemo(
+    () => allProfiles.filter((profile) => selectedIds.has(profile.id)),
+    [allProfiles, selectedIds]
+  );
+  const totalPages = Math.max(1, Math.ceil(profiles.length / itemsPerPage));
+  const safeCurrentPage = React.useMemo(() => {
+    if (currentPage < 1) return 1;
+    if (currentPage > totalPages) return totalPages;
+    return currentPage;
+  }, [currentPage, totalPages]);
+  const paginatedProfiles = React.useMemo(() => {
+    const start = (safeCurrentPage - 1) * itemsPerPage;
+    return profiles.slice(start, start + itemsPerPage);
+  }, [profiles, safeCurrentPage]);
+  const pageProfileIds = React.useMemo(() => paginatedProfiles.map((profile) => profile.id), [paginatedProfiles]);
+  const allSelected = pageProfileIds.length > 0 && pageProfileIds.every((id2) => selectedIds.has(id2));
+  const someSelected = pageProfileIds.some((id2) => selectedIds.has(id2)) && !allSelected;
+  const pageNumberItems = React.useMemo(() => {
+    const maxButtons = 5;
+    const half = Math.floor(maxButtons / 2);
+    let start = Math.max(1, safeCurrentPage - half);
+    let end = Math.min(totalPages, start + maxButtons - 1);
+    if (end - start + 1 < maxButtons) {
+      start = Math.max(1, end - maxButtons + 1);
+    }
+    const pages = [];
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+    return pages;
+  }, [safeCurrentPage, totalPages]);
+  React.useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage);
+    }
+  }, [currentPage, safeCurrentPage]);
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+  React.useEffect(() => {
+    const loadDependencies = async () => {
+      try {
+        const fetchedProxies = await window.api.proxies.getAll();
+        setAllProxies(fetchedProxies);
+      } catch (err) {
+        console.error("Failed to load proxies:", err);
+      }
+    };
+    void loadDependencies();
+  }, []);
+  const toggleSelectAllOnPage = (checked) => {
+    pageProfileIds.forEach((id2) => {
+      handleSelect(id2, checked);
+    });
+  };
   const stats = [
     { label: "Profiles", value: allProfiles.length.toString(), icon: "person_pin" },
     {
@@ -8934,15 +9105,46 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
         await handleBulkOpen(selectedProfileIds);
       } else if (bulkAction === "close") {
         await handleBulkClose(selectedProfileIds);
-      } else {
+      } else if (bulkAction === "assignProxy") {
         const input = window.prompt("Enter proxy id to assign (leave empty to clear proxy):", "");
         if (input === null) {
           return;
         }
         const proxyId = input.trim() || void 0;
         await handleBulkAssignProxy(selectedProfileIds, proxyId);
+      } else if (bulkAction === "removeProxy") {
+        await handleBulkAssignProxy(selectedProfileIds, void 0);
+      } else {
+        if (allProxies.length === 0) {
+          window.alert("No proxies available. Create proxies first in Proxy Manager.");
+          return;
+        }
+        const draft = {};
+        selectedProfiles.forEach((profile, idx) => {
+          const autoProxy = allProxies[idx % allProxies.length];
+          draft[profile.id] = autoProxy?.id;
+        });
+        setProxyMapDraft(draft);
+        setShowProxyMapModal(true);
+        return;
       }
       clearSelection();
+    });
+  };
+  const applyProxyMapDraft = async () => {
+    await runProfileAction(async () => {
+      await handleBulkAssignProxyMap(proxyMapDraft);
+      setShowProxyMapModal(false);
+      clearSelection();
+    });
+  };
+  const runExportZip = async (profile) => {
+    await runProfileAction(async () => {
+      const zipPath = await handleExportZip(profile.id);
+      if (zipPath) {
+        window.alert(`Profile exported successfully:
+${zipPath}`);
+      }
     });
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full", children: [
@@ -8984,13 +9186,14 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
               onClick: onCreateProfile,
               className: "flex items-center gap-1.5 border border-primary text-primary \n                px-4 py-2 rounded text-sm font-semibold hover:bg-primary/[0.06] transition-colors",
               id: "new-profile-btn",
+              title: "Tạo profile mới",
               children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "add" }),
                 "New Profile"
               ]
             }
           ),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary flex items-center gap-1.5 text-sm", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary flex items-center gap-1.5 text-sm", title: "Nhập profile từ file (đang phát triển)", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "upload_file" }),
             "Import"
           ] }),
@@ -9004,7 +9207,9 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
                 children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "open", children: "Bulk Open" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "close", children: "Bulk Close" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "assignProxy", children: "Bulk Proxy Assign" })
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "assignProxy", children: "Bulk Proxy Assign" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "removeProxy", children: "Bulk Remove Proxy" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "assignProxyMap", children: "Bulk Unique Proxy (Per Account)" })
                 ]
               }
             ),
@@ -9015,6 +9220,7 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
                   void runBulkAction();
                 },
                 className: "btn-secondary flex items-center gap-1.5 text-sm",
+                title: "Chạy thao tác hàng loạt",
                 children: [
                   "Run (",
                   selectedProfileIds.length,
@@ -9038,8 +9244,8 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
               }
             )
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary p-2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[20px]", children: "filter_alt" }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary p-2.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[20px]", children: "sort" }) })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary p-2.5", title: "Bộ lọc (đang phát triển)", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[20px]", children: "filter_alt" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary p-2.5", title: "Sắp xếp (đang phát triển)", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[20px]", children: "sort" }) })
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/10 shadow-2xl", children: [
@@ -9057,7 +9263,7 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
                 ref: (el2) => {
                   if (el2) el2.indeterminate = someSelected;
                 },
-                onChange: (e) => handleSelectAll(e.target.checked),
+                onChange: (e) => toggleSelectAllOnPage(e.target.checked),
                 className: "rounded bg-surface border-outline-variant text-primary focus:ring-primary focus:ring-offset-surface"
               }
             ) }),
@@ -9073,7 +9279,7 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsxs("tbody", { className: "divide-y divide-white/[0.04]", children: [
             isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 9, className: "py-10 text-center text-sm text-on-surface-variant", children: "Loading profiles..." }) }),
             !isLoading && profiles.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 9, className: "py-10 text-center text-sm text-on-surface-variant", children: "No profiles found. Create your first profile to get started." }) }),
-            profiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            paginatedProfiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
               ProfileRow,
               {
                 profile,
@@ -9086,6 +9292,15 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
                   void runProfileAction(() => handleStop(id2));
                 },
                 onEdit: (profile2) => onEditProfile?.(profile2),
+                onTogglePin: (id2) => {
+                  void runProfileAction(() => handleTogglePin(id2));
+                },
+                onOpenFolder: (id2) => {
+                  void runProfileAction(() => handleOpenFolder(id2));
+                },
+                onExportZip: (profile2) => {
+                  void runExportZip(profile2);
+                },
                 onDelete: (id2) => {
                   void runProfileAction(() => handleDelete(id2));
                 }
@@ -9097,26 +9312,98 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-5 flex items-center justify-between text-xs text-on-surface-variant", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { children: [
-          "Showing 1-",
-          profiles.length,
+          "Showing ",
+          profiles.length === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage + 1,
+          "-",
+          Math.min(safeCurrentPage * itemsPerPage, profiles.length),
           " of ",
-          allProfiles.length,
-          " profiles"
+          profiles.length,
+          " profiles",
+          profiles.length !== allProfiles.length ? ` (total ${allProfiles.length})` : ""
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "chevron_left" }) }),
-          [1, 2, 3].map((n2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
-              className: `w-8 h-8 rounded font-bold text-xs transition-colors ${n2 === 1 ? "btn-primary" : "text-on-surface-variant hover:bg-surface-container-highest"}`,
+              type: "button",
+              disabled: safeCurrentPage <= 1,
+              onClick: () => setCurrentPage((prev) => Math.max(1, prev - 1)),
+              className: "p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "chevron_left" })
+            }
+          ),
+          pageNumberItems.map((n2) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              onClick: () => setCurrentPage(n2),
+              className: `w-8 h-8 rounded font-bold text-xs transition-colors ${n2 === safeCurrentPage ? "btn-primary" : "text-on-surface-variant hover:bg-surface-container-highest"}`,
               children: n2
             },
             n2
           )),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "chevron_right" }) })
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              disabled: safeCurrentPage >= totalPages,
+              onClick: () => setCurrentPage((prev) => Math.min(totalPages, prev + 1)),
+              className: "p-2 border border-outline-variant/30 rounded hover:text-on-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "chevron_right" })
+            }
+          )
         ] })
       ] })
-    ] })
+    ] }),
+    showProxyMapModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-[760px] rounded-lg border border-outline-variant/20 bg-surface-container-high shadow-2xl", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-6 py-4 border-b border-white/[0.06] flex items-center justify-between", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "text-sm font-bold text-on-surface", children: "Bulk Unique Proxy Assignment" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant mt-1", children: "Auto-mapped sequentially. You can adjust proxy for each selected profile." })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setShowProxyMapModal(false),
+            className: "p-1.5 text-on-surface-variant hover:text-on-surface",
+            "aria-label": "Close",
+            children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "close" })
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "px-6 py-4 max-h-[380px] overflow-y-auto space-y-3", children: selectedProfiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[1fr_280px] items-center gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-on-surface", children: profile.name }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-on-surface-variant", children: profile.id })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "select",
+          {
+            value: proxyMapDraft[profile.id] ?? "",
+            onChange: (event) => {
+              const value = event.target.value || void 0;
+              setProxyMapDraft((prev) => ({ ...prev, [profile.id]: value }));
+            },
+            className: "w-full bg-surface-container-highest border border-outline-variant/30 rounded px-3 py-2 text-sm text-on-surface",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "", children: "— No Proxy —" }),
+              allProxies.map((proxy) => /* @__PURE__ */ jsxRuntimeExports.jsxs("option", { value: proxy.id, children: [
+                proxy.alias,
+                " (",
+                proxy.host,
+                ":",
+                proxy.port,
+                ")"
+              ] }, proxy.id))
+            ]
+          }
+        )
+      ] }, profile.id)) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-6 py-4 border-t border-white/[0.06] flex justify-end gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary text-sm", onClick: () => setShowProxyMapModal(false), children: "Cancel" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary text-sm", onClick: () => void applyProxyMapDraft(), children: "Apply Mapping" })
+      ] })
+    ] }) })
   ] });
 };
 const PROXY_LIST = [
@@ -9325,6 +9612,153 @@ const Automation = () => {
   ] });
 };
 const CookiesManager = () => {
+  const fileInputRef = reactExports.useRef(null);
+  const [profiles, setProfiles] = reactExports.useState([]);
+  const [isLoadingProfiles, setIsLoadingProfiles] = reactExports.useState(true);
+  const [selectedProfileId, setSelectedProfileId] = reactExports.useState("");
+  const [searchQuery, setSearchQuery] = reactExports.useState("");
+  const [format, setFormat] = reactExports.useState("json");
+  const [cookies, setCookies] = reactExports.useState([]);
+  const [isLoadingCookies, setIsLoadingCookies] = reactExports.useState(false);
+  const [error, setError] = reactExports.useState(null);
+  const [dragActive, setDragActive] = reactExports.useState(false);
+  const filteredProfiles = reactExports.useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) {
+      return profiles;
+    }
+    return profiles.filter((profile) => profile.name.toLowerCase().includes(keyword));
+  }, [profiles, searchQuery]);
+  const selectedProfile = reactExports.useMemo(
+    () => profiles.find((profile) => profile.id === selectedProfileId) ?? null,
+    [profiles, selectedProfileId]
+  );
+  const loadProfiles = async () => {
+    setIsLoadingProfiles(true);
+    setError(null);
+    try {
+      const fetched = await window.api.profiles.getAll();
+      setProfiles(fetched);
+      setSelectedProfileId((current) => current || fetched[0]?.id || "");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load profiles.";
+      setError(message);
+    } finally {
+      setIsLoadingProfiles(false);
+    }
+  };
+  const loadCookies = async (profileId, targetFormat) => {
+    if (!profileId) {
+      setCookies([]);
+      return;
+    }
+    setIsLoadingCookies(true);
+    setError(null);
+    try {
+      const result = await window.api.cookies.read(profileId, targetFormat);
+      if (!result.success) {
+        throw new Error(result.error ?? "Failed to read cookies.");
+      }
+      setCookies(result.cookies);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load cookies.";
+      setError(message);
+      setCookies([]);
+    } finally {
+      setIsLoadingCookies(false);
+    }
+  };
+  reactExports.useEffect(() => {
+    void loadProfiles();
+  }, []);
+  reactExports.useEffect(() => {
+    if (!selectedProfileId) {
+      setCookies([]);
+      return;
+    }
+    void loadCookies(selectedProfileId, format);
+  }, [selectedProfileId, format]);
+  const detectFormat = (filename) => {
+    const normalized = filename.trim().toLowerCase();
+    if (normalized.endsWith(".json")) {
+      return "json";
+    }
+    return "netscape";
+  };
+  const importCookieFile = async (file) => {
+    if (!selectedProfileId) {
+      setError("Please select a profile before importing cookies.");
+      return;
+    }
+    setError(null);
+    const content = await file.text();
+    const importedFormat = detectFormat(file.name);
+    setFormat(importedFormat);
+    const result = await window.api.cookies.write(selectedProfileId, importedFormat, content);
+    if (!result.success) {
+      setError(result.error ?? "Failed to import cookie file.");
+      return;
+    }
+    await loadCookies(selectedProfileId, importedFormat);
+  };
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) {
+      return;
+    }
+    void importCookieFile(file);
+  };
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+  const handleFileInputChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    void importCookieFile(file);
+    event.target.value = "";
+  };
+  const handleExport = async () => {
+    if (!selectedProfileId) {
+      setError("Please select a profile before exporting cookies.");
+      return;
+    }
+    try {
+      const result = await window.api.cookies.read(selectedProfileId, format);
+      if (!result.success) {
+        throw new Error(result.error ?? "Failed to export cookies.");
+      }
+      const extension = format === "json" ? "json" : "txt";
+      const profileName = (selectedProfile?.name ?? "profile").replace(/\s+/g, "_");
+      const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${profileName}_cookies.${extension}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to export cookies.";
+      setError(message);
+    }
+  };
+  const handleClear = async () => {
+    if (!selectedProfileId) {
+      setError("Please select a profile before clearing cookies.");
+      return;
+    }
+    const result = await window.api.cookies.clear(selectedProfileId);
+    if (!result.success) {
+      setError(result.error ?? "Failed to clear cookies.");
+      return;
+    }
+    setCookies([]);
+  };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col pt-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-8 pb-4 border-b border-white/[0.05] shrink-0", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold tracking-tight text-on-surface mb-1", children: "Cookies Management" }),
@@ -9334,54 +9768,104 @@ const CookiesManager = () => {
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-[280px] max-w-[30%] flex flex-col border-r border-white/[0.05] bg-surface-container-low/50", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-4 shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]", children: "search" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "text", placeholder: "Filter profiles...", className: "w-full bg-surface-container-highest border-none focus:ring-1 focus:ring-primary rounded pl-9 pr-3 py-1.5 text-xs text-on-surface" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              value: searchQuery,
+              onChange: (event) => setSearchQuery(event.target.value),
+              type: "text",
+              placeholder: "Filter profiles...",
+              className: "w-full bg-surface-container-highest border-none focus:ring-1 focus:ring-primary rounded pl-9 pr-3 py-1.5 text-xs text-on-surface"
+            }
+          )
         ] }) }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "overflow-y-auto flex-1 divide-y divide-white/[0.03]", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-3 bg-surface-bright/50 border-l-2 border-primary cursor-pointer hover:bg-surface-bright/70", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-semibold text-on-surface block mb-1", children: "FB_Shop_Account_01" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-tertiary/80 rounded block", children: "182 Cookies Stored" })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-3 hover:bg-surface-bright/30 border-l-2 border-transparent cursor-pointer transition-colors", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium text-on-surface-variant block mb-1", children: "ShopeeVN_Seller_02" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-on-surface-variant/70 rounded block", children: "45 Cookies Stored" })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-3 hover:bg-surface-bright/30 border-l-2 border-transparent cursor-pointer transition-colors", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium text-on-surface-variant block mb-1", children: "Ads_Master_UK_01" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-on-surface-variant/70 rounded block", children: "0 Cookies Stored" })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-4 py-3 hover:bg-surface-bright/30 border-l-2 border-transparent cursor-pointer transition-colors", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm font-medium text-on-surface-variant block mb-1", children: "Amazon_Review_Gen_04" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-on-surface-variant/70 rounded block", children: "301 Cookies Stored" })
-          ] })
+          isLoadingProfiles && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "px-4 py-3 text-xs text-on-surface-variant", children: "Loading profiles..." }),
+          !isLoadingProfiles && filteredProfiles.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "px-4 py-3 text-xs text-on-surface-variant", children: "No profile matched your filter." }),
+          !isLoadingProfiles && filteredProfiles.map((profile) => {
+            const isSelected = profile.id === selectedProfileId;
+            return /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => setSelectedProfileId(profile.id),
+                className: `w-full text-left px-4 py-3 border-l-2 transition-colors ${isSelected ? "bg-surface-bright/50 border-primary hover:bg-surface-bright/70" : "hover:bg-surface-bright/30 border-transparent"}`,
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-sm block mb-1 ${isSelected ? "font-semibold text-on-surface" : "font-medium text-on-surface-variant"}`, children: profile.name }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] text-on-surface-variant/70 rounded block", children: isSelected ? `${cookies.length} cookies loaded` : "Click to view cookies" })
+                ]
+              },
+              profile.id
+            );
+          })
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 flex flex-col p-8 bg-surface overflow-y-auto", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-6", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold text-on-surface", children: "Cookies Data" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary text-sm flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-3 items-center", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "select",
+              {
+                value: format,
+                onChange: (event) => setFormat(event.target.value),
+                className: "bg-surface-container-highest border border-outline-variant/20 focus:ring-1 focus:ring-primary/30 rounded-lg py-1.5 pl-3 pr-8 text-xs text-on-surface",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "json", children: "JSON" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "netscape", children: "Netscape/TXT" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => void handleClear(), className: "btn-secondary text-sm flex items-center gap-1.5", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "delete" }),
               " Clear All"
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "btn-secondary text-sm flex items-center gap-1.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { onClick: () => void handleExport(), className: "btn-secondary text-sm flex items-center gap-1.5", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "download" }),
               " Export JSON"
             ] })
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border-2 border-dashed border-outline-variant/50 hover:border-primary/50 transition-colors rounded-xl p-10 flex flex-col items-center justify-center bg-surface-container-low mb-8", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-4xl text-on-surface-variant mb-4", children: "cloud_upload" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-on-surface font-semibold mb-1", children: "Drag and drop Cookie file here" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-on-surface-variant mb-4 flex gap-1", children: [
-            "Supports ",
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono bg-surface-container-highest px-1 rounded", children: "JSON" }),
-            " and ",
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono bg-surface-container-highest px-1 rounded", children: "Netscape/TXT" }),
-            " formats"
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary text-xs", children: "Browse Files" })
+        error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mb-6 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm text-error", children: error }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            onDrop: handleDrop,
+            onDragOver: (event) => {
+              event.preventDefault();
+              setDragActive(true);
+            },
+            onDragLeave: () => setDragActive(false),
+            className: `border-2 border-dashed transition-colors rounded-xl p-10 flex flex-col items-center justify-center bg-surface-container-low mb-8 ${dragActive ? "border-primary/70" : "border-outline-variant/50 hover:border-primary/50"}`,
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-4xl text-on-surface-variant mb-4", children: "cloud_upload" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-on-surface font-semibold mb-1", children: "Drag and drop Cookie file here" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-on-surface-variant mb-4 flex gap-1", children: [
+                "Supports ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono bg-surface-container-highest px-1 rounded", children: "JSON" }),
+                " and ",
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono bg-surface-container-highest px-1 rounded", children: "Netscape/TXT" }),
+                " formats"
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: handleBrowseClick, className: "btn-primary text-xs", children: "Browse Files" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "input",
+                {
+                  ref: fileInputRef,
+                  type: "file",
+                  accept: ".json,.txt",
+                  className: "hidden",
+                  onChange: handleFileInputChange
+                }
+              )
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4", children: [
+          "Preview (",
+          selectedProfile?.name ?? "No profile selected",
+          ")"
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4", children: "Preview (FB_Shop_Account_01)" }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-surface-container-highest/20 rounded-lg border border-outline-variant/20 overflow-hidden font-mono text-[11px] p-0 flex-1 min-h-[300px]", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-left border-collapse", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-surface-container/50 sticky top-0", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold", children: "Domain" }),
@@ -9391,36 +9875,411 @@ const CookiesManager = () => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-24", children: "Expires" })
           ] }) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("tbody", { className: "divide-y divide-white/[0.05]", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: ".facebook.com" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: "c_user" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: "100083234912234" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: "/" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: "2027-01-01" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: ".facebook.com" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: "xs" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: "45%3ATr7X2dJpA..." }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: "/" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: "2027-01-01" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: ".facebook.com" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: "fr" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: "0X1Y2Z3A4B5C.D6..." }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: "/" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: "2026-06-01" })
-            ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: "google.com" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: "NID" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: "511=abCDEfGHIjk..." }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: "/" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: "2026-09-12" })
-            ] })
+            isLoadingCookies && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 5, className: "px-4 py-8 text-center text-on-surface-variant", children: "Loading cookies..." }) }),
+            !isLoadingCookies && cookies.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 5, className: "px-4 py-8 text-center text-on-surface-variant", children: "No cookies available for this profile and format." }) }),
+            !isLoadingCookies && cookies.map((cookie, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: cookie.domain }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: cookie.name }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: cookie.value }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: cookie.path || "/" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: cookie.expires > 0 ? new Date(cookie.expires * 1e3).toLocaleDateString() : "Session" })
+            ] }, `${cookie.domain}-${cookie.name}-${index}`))
           ] })
         ] }) })
+      ] })
+    ] })
+  ] });
+};
+const BookmarksManager = () => {
+  const fileInputRef = reactExports.useRef(null);
+  const [profiles, setProfiles] = reactExports.useState([]);
+  const [selectedProfileId, setSelectedProfileId] = reactExports.useState("");
+  const [bookmarks, setBookmarks] = reactExports.useState([]);
+  const [title, setTitle] = reactExports.useState("");
+  const [url, setUrl] = reactExports.useState("");
+  const [folder, setFolder] = reactExports.useState("");
+  const [jsonInput, setJsonInput] = reactExports.useState("");
+  const [isLoading, setIsLoading] = reactExports.useState(false);
+  const [error, setError] = reactExports.useState(null);
+  const selectedProfile = reactExports.useMemo(
+    () => profiles.find((profile) => profile.id === selectedProfileId) ?? null,
+    [profiles, selectedProfileId]
+  );
+  const loadProfiles = async () => {
+    const fetched = await window.api.profiles.getAll();
+    setProfiles(fetched);
+    setSelectedProfileId((prev) => prev || fetched[0]?.id || "");
+  };
+  const loadBookmarks = async (profileId) => {
+    if (!profileId) {
+      setBookmarks([]);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const items = await window.api.bookmarks.list(profileId);
+      setBookmarks(items);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load bookmarks.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  reactExports.useEffect(() => {
+    void loadProfiles();
+  }, []);
+  reactExports.useEffect(() => {
+    void loadBookmarks(selectedProfileId);
+  }, [selectedProfileId]);
+  const addBookmark = async () => {
+    if (!selectedProfileId) return;
+    setError(null);
+    const result = await window.api.bookmarks.add(selectedProfileId, {
+      title,
+      url,
+      folder: folder || void 0
+    });
+    if (!result.success) {
+      setError(result.error ?? "Failed to add bookmark.");
+      return;
+    }
+    setTitle("");
+    setUrl("");
+    setFolder("");
+    await loadBookmarks(selectedProfileId);
+  };
+  const deleteBookmark = async (bookmarkId) => {
+    if (!selectedProfileId) return;
+    const result = await window.api.bookmarks.delete(selectedProfileId, bookmarkId);
+    if (!result.success) {
+      setError(result.error ?? "Failed to delete bookmark.");
+      return;
+    }
+    await loadBookmarks(selectedProfileId);
+  };
+  const importJson = async (content) => {
+    if (!selectedProfileId) return;
+    const result = await window.api.bookmarks.importJson(selectedProfileId, content);
+    if (!result.success) {
+      setError(result.error ?? "Failed to import bookmarks.");
+      return;
+    }
+    setJsonInput("");
+    await loadBookmarks(selectedProfileId);
+  };
+  const onImportFromText = async () => {
+    if (!jsonInput.trim()) {
+      setError("Paste JSON content before importing.");
+      return;
+    }
+    await importJson(jsonInput);
+  };
+  const onImportFromFile = async (file) => {
+    const content = await file.text();
+    await importJson(content);
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col pt-4", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-8 pb-4 border-b border-white/[0.05] shrink-0", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold tracking-tight text-on-surface mb-1", children: "Bookmarks Management" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-on-surface-variant", children: "Add, delete, and import bookmarks by profile. If profile is running, app will request restart first." })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 overflow-auto grid grid-cols-[280px_1fr] gap-6 h-full", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-bold text-on-surface mb-3", children: "Profiles" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-1 max-h-[520px] overflow-auto", children: profiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setSelectedProfileId(profile.id),
+            className: `w-full text-left px-3 py-2 rounded text-sm transition-colors ${selectedProfileId === profile.id ? "bg-surface-bright border border-primary/40 text-on-surface" : "text-on-surface-variant hover:bg-surface-container-high"}`,
+            children: profile.name
+          },
+          profile.id
+        )) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-5", children: [
+        error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded border border-error/40 bg-error/10 px-4 py-3 text-sm text-error", children: error }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-bold text-on-surface mb-3", children: "Quick Add Bookmark" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-on-surface-variant mb-3", children: [
+            "Target profile: ",
+            selectedProfile?.name ?? "None selected"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: title,
+                onChange: (event) => setTitle(event.target.value),
+                placeholder: "Title",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: url,
+                onChange: (event) => setUrl(event.target.value),
+                placeholder: "https://example.com",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: folder,
+                onChange: (event) => setFolder(event.target.value),
+                placeholder: "Folder (optional)",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary text-sm", onClick: () => void addBookmark(), children: "Add Bookmark" }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-bold text-on-surface mb-3", children: "Import from JSON" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "textarea",
+            {
+              value: jsonInput,
+              onChange: (event) => setJsonInput(event.target.value),
+              placeholder: '[{"title":"Docs","url":"https://example.com"}]',
+              rows: 5,
+              className: "w-full bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 flex items-center gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary text-sm", onClick: () => fileInputRef.current?.click(), children: "Import JSON File" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary text-sm", onClick: () => void onImportFromText(), children: "Import Text" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                ref: fileInputRef,
+                type: "file",
+                accept: "application/json,.json",
+                className: "hidden",
+                onChange: (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  void onImportFromFile(file);
+                  event.target.value = "";
+                }
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { className: "text-sm font-bold text-on-surface mb-3", children: [
+            "Bookmarks (",
+            bookmarks.length,
+            ")"
+          ] }),
+          isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant", children: "Loading..." }),
+          !isLoading && bookmarks.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant", children: "No bookmarks for selected profile." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: bookmarks.map((bookmark) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-3 border border-outline-variant/10 rounded p-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-on-surface", children: bookmark.title }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-primary break-all", children: bookmark.url }),
+              bookmark.folder && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-[11px] text-on-surface-variant mt-1", children: [
+                "Folder: ",
+                bookmark.folder
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                className: "p-1.5 text-on-surface-variant hover:text-error",
+                onClick: () => void deleteBookmark(bookmark.id),
+                "aria-label": "Delete bookmark",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "delete" })
+              }
+            )
+          ] }, bookmark.id)) })
+        ] })
+      ] })
+    ] })
+  ] });
+};
+const ExtensionsManager = () => {
+  const [profiles, setProfiles] = reactExports.useState([]);
+  const [selectedProfileId, setSelectedProfileId] = reactExports.useState("");
+  const [extensions, setExtensions] = reactExports.useState([]);
+  const [unpackedPath, setUnpackedPath] = reactExports.useState("");
+  const [crxPath, setCrxPath] = reactExports.useState("");
+  const [webstoreUrl, setWebstoreUrl] = reactExports.useState("");
+  const [error, setError] = reactExports.useState(null);
+  const [isLoading, setIsLoading] = reactExports.useState(false);
+  const selectedProfile = reactExports.useMemo(
+    () => profiles.find((profile) => profile.id === selectedProfileId) ?? null,
+    [profiles, selectedProfileId]
+  );
+  const loadProfiles = async () => {
+    const fetched = await window.api.profiles.getAll();
+    setProfiles(fetched);
+    setSelectedProfileId((prev) => prev || fetched[0]?.id || "");
+  };
+  const loadExtensions = async (profileId) => {
+    if (!profileId) {
+      setExtensions([]);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    try {
+      const items = await window.api.extensions.list(profileId);
+      setExtensions(items);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load extensions.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  reactExports.useEffect(() => {
+    void loadProfiles();
+  }, []);
+  reactExports.useEffect(() => {
+    void loadExtensions(selectedProfileId);
+  }, [selectedProfileId]);
+  const runAction = async (action) => {
+    setError(null);
+    const result = await action();
+    if (!result.success) {
+      setError(result.error ?? "Extension action failed.");
+      return false;
+    }
+    await loadExtensions(selectedProfileId);
+    return true;
+  };
+  const onInstallUnpacked = async () => {
+    if (!selectedProfileId || !unpackedPath.trim()) return;
+    const ok2 = await runAction(() => window.api.extensions.installUnpacked(selectedProfileId, unpackedPath.trim()));
+    if (ok2) {
+      setUnpackedPath("");
+    }
+  };
+  const onInstallCrx = async () => {
+    if (!selectedProfileId || !crxPath.trim()) return;
+    const ok2 = await runAction(() => window.api.extensions.installCrx(selectedProfileId, crxPath.trim()));
+    if (ok2) {
+      setCrxPath("");
+    }
+  };
+  const onInstallWebstore = async () => {
+    if (!selectedProfileId || !webstoreUrl.trim()) return;
+    const ok2 = await runAction(() => window.api.extensions.installWebstore(selectedProfileId, webstoreUrl.trim()));
+    if (ok2) {
+      setWebstoreUrl("");
+    }
+  };
+  const onToggle = async (record, enabled) => {
+    await runAction(() => window.api.extensions.toggle(selectedProfileId, record.id, enabled));
+  };
+  const onRemove = async (record) => {
+    await runAction(() => window.api.extensions.remove(selectedProfileId, record.id));
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col pt-4", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-8 pb-4 border-b border-white/[0.05] shrink-0", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold tracking-tight text-on-surface mb-1", children: "Extensions Management" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-on-surface-variant", children: "Install by unpacked folder, CRX path, or Chrome Web Store URL. Stop profile before changing extensions." })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 overflow-auto grid grid-cols-[280px_1fr] gap-6 h-full", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-bold text-on-surface mb-3", children: "Profiles" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-1 max-h-[520px] overflow-auto", children: profiles.map((profile) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            onClick: () => setSelectedProfileId(profile.id),
+            className: `w-full text-left px-3 py-2 rounded text-sm transition-colors ${selectedProfileId === profile.id ? "bg-surface-bright border border-primary/40 text-on-surface" : "text-on-surface-variant hover:bg-surface-container-high"}`,
+            children: profile.name
+          },
+          profile.id
+        )) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-5", children: [
+        error && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded border border-error/40 bg-error/10 px-4 py-3 text-sm text-error", children: error }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-bold text-on-surface mb-3", children: "Install Extension" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-on-surface-variant mb-3", children: [
+            "Target profile: ",
+            selectedProfile?.name ?? "None selected"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[1fr_auto] gap-2 mb-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: unpackedPath,
+                onChange: (event) => setUnpackedPath(event.target.value),
+                placeholder: "Unpacked extension directory path",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary text-sm", onClick: () => void onInstallUnpacked(), children: "Install Unpacked" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[1fr_auto] gap-2 mb-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: crxPath,
+                onChange: (event) => setCrxPath(event.target.value),
+                placeholder: "CRX file path",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-secondary text-sm", onClick: () => void onInstallCrx(), children: "Install CRX" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[1fr_auto] gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: webstoreUrl,
+                onChange: (event) => setWebstoreUrl(event.target.value),
+                placeholder: "Chrome Web Store URL",
+                className: "bg-surface-container-highest border border-outline-variant/20 rounded px-3 py-2 text-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "btn-primary text-sm", onClick: () => void onInstallWebstore(), children: "Install Web Store URL" })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-surface-container-low rounded-lg border border-outline-variant/10 p-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("h2", { className: "text-sm font-bold text-on-surface mb-3", children: [
+            "Installed Extensions (",
+            extensions.length,
+            ")"
+          ] }),
+          isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant", children: "Loading..." }),
+          !isLoading && extensions.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant", children: "No extensions installed for selected profile." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: extensions.map((record) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "border border-outline-variant/10 rounded p-3 flex items-start justify-between gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-on-surface", children: record.extensionName }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant break-all", children: record.extensionPath }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-[11px] text-primary mt-1", children: [
+                "Source: ",
+                record.source
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: `px-2 py-1 rounded text-xs ${record.enabled ? "bg-primary/20 text-primary" : "bg-surface-container-high text-on-surface-variant"}`,
+                  onClick: () => void onToggle(record, !record.enabled),
+                  children: record.enabled ? "Enabled" : "Disabled"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "p-1.5 text-on-surface-variant hover:text-error",
+                  onClick: () => void onRemove(record),
+                  "aria-label": "Remove extension",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px]", children: "delete" })
+                }
+              )
+            ] })
+          ] }, record.id)) })
+        ] })
       ] })
     ] })
   ] });
@@ -9737,11 +10596,6 @@ const CreateProfileModal = ({
     }
   );
 };
-const PlaceholderPage = ({ title, icon }) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center justify-center h-full gap-4 text-on-surface-variant", children: [
-  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[64px] text-primary opacity-30", children: icon }),
-  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-headline-sm font-bold text-on-surface opacity-50", children: title }),
-  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm", children: "Coming soon — designs ready, implementation next." })
-] });
 const App = () => {
   const [isCreateModalOpen, setCreateModalOpen] = reactExports.useState(false);
   const [editingProfile, setEditingProfile] = reactExports.useState(null);
@@ -9820,14 +10674,14 @@ const App = () => {
         Route,
         {
           path: "/extensions",
-          element: /* @__PURE__ */ jsxRuntimeExports.jsx(PlaceholderPage, { title: "Extensions", icon: "extension" })
+          element: /* @__PURE__ */ jsxRuntimeExports.jsx(ExtensionsManager, {})
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Route,
         {
-          path: "/logs",
-          element: /* @__PURE__ */ jsxRuntimeExports.jsx(PlaceholderPage, { title: "Logs", icon: "terminal" })
+          path: "/bookmarks",
+          element: /* @__PURE__ */ jsxRuntimeExports.jsx(BookmarksManager, {})
         }
       ),
       /* @__PURE__ */ jsxRuntimeExports.jsx(

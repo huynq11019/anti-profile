@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Profile } from '@shared/types'
+import { emitToast, ensureIpcSuccess, runIpcAction } from '@renderer/utils/errorHandler'
 
 export const useDashboard = () => {
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -11,15 +12,18 @@ export const useDashboard = () => {
   const loadProfiles = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-    try {
-      const fetched = await window.api.profiles.getAll()
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: 'Unable to load profiles',
+      fallbackMessage: 'Failed to fetch profiles.',
+      context: 'dashboard.loadProfiles',
+      onError: (message) => setError(message)
+    })
+
+    if (fetched) {
       setProfiles(fetched)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch profiles.'
-      setError(message)
-    } finally {
-      setIsLoading(false)
     }
+
+    setIsLoading(false)
   }, [])
 
   useEffect(() => {
@@ -41,6 +45,12 @@ export const useDashboard = () => {
 
       if (state.status === 'error' && state.error) {
         setError(state.error)
+        emitToast({
+          title: 'Profile runtime error',
+          message: state.error,
+          variant: 'error',
+          dedupeKey: `profile-status-error:${state.profileId}:${state.error}`
+        })
       }
     })
 
@@ -81,11 +91,7 @@ export const useDashboard = () => {
   )
 
   const handleLaunch = useCallback(async (id: string) => {
-    const result = await window.api.profiles.start([id])
-    if (!result.success) {
-      const launchErrors = result.errors?.join(', ') ?? 'Unknown launch error.'
-      throw new Error(launchErrors)
-    }
+    ensureIpcSuccess(await window.api.profiles.start([id]), 'Unknown launch error.')
 
     setProfiles((prev) => {
       const now = new Date().toISOString()
@@ -94,11 +100,7 @@ export const useDashboard = () => {
   }, [])
 
   const handleStop = useCallback(async (id: string) => {
-    const result = await window.api.profiles.stop([id])
-    if (!result.success) {
-      const stopErrors = result.errors?.join(', ') ?? 'Unknown stop error.'
-      throw new Error(stopErrors)
-    }
+    ensureIpcSuccess(await window.api.profiles.stop([id]), 'Unknown stop error.')
 
     setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'idle' } : p)))
   }, [])
@@ -124,10 +126,7 @@ export const useDashboard = () => {
   }, [loadProfiles, profiles])
 
   const handleOpenFolder = useCallback(async (id: string) => {
-    const result = await window.api.profiles.openFolder(id)
-    if (!result.success) {
-      throw new Error(result.error ?? 'Failed to open profile folder.')
-    }
+    ensureIpcSuccess(await window.api.profiles.openFolder(id), 'Failed to open profile folder.')
   }, [])
 
   const handleQuickUpdate = useCallback(async (id: string, updates: Partial<Profile>) => {
@@ -136,42 +135,27 @@ export const useDashboard = () => {
   }, [])
 
   const handleExportZip = useCallback(async (id: string) => {
-    const result = await window.api.profiles.exportZip(id)
-    if (!result.success) {
-      throw new Error(result.error ?? 'Failed to export profile ZIP.')
-    }
+    const result = ensureIpcSuccess(await window.api.profiles.exportZip(id), 'Failed to export profile ZIP.')
 
     return result.path
   }, [])
 
   const handleBulkOpen = useCallback(async (profileIds: string[]) => {
-    const result = await window.api.profiles.bulkOpen(profileIds)
-    if (!result.success) {
-      throw new Error(result.errors?.join(', ') ?? 'Bulk open failed.')
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkOpen(profileIds), 'Bulk open failed.')
   }, [])
 
   const handleBulkClose = useCallback(async (profileIds: string[]) => {
-    const result = await window.api.profiles.bulkClose(profileIds)
-    if (!result.success) {
-      throw new Error(result.errors?.join(', ') ?? 'Bulk close failed.')
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkClose(profileIds), 'Bulk close failed.')
   }, [])
 
   const handleBulkAssignProxy = useCallback(async (profileIds: string[], proxyId?: string) => {
-    const result = await window.api.profiles.bulkAssignProxy(profileIds, proxyId)
-    if (!result.success) {
-      throw new Error(result.errors?.join(', ') ?? 'Bulk proxy assign failed.')
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkAssignProxy(profileIds, proxyId), 'Bulk proxy assign failed.')
 
     setProfiles((prev) => prev.map((profile) => (profileIds.includes(profile.id) ? { ...profile, proxyId } : profile)))
   }, [])
 
   const handleBulkAssignProxyMap = useCallback(async (profileProxyMap: Record<string, string | undefined>) => {
-    const result = await window.api.profiles.bulkAssignProxyMap(profileProxyMap)
-    if (!result.success) {
-      throw new Error(result.errors?.join(', ') ?? 'Bulk proxy map assign failed.')
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkAssignProxyMap(profileProxyMap), 'Bulk proxy map assign failed.')
 
     setProfiles((prev) =>
       prev.map((profile) =>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { CookieFormat, CookieRecord, Profile } from '@shared/types'
+import { emitToast, ensureIpcSuccess, runIpcAction } from '@renderer/utils/errorHandler'
 
 export const CookiesManager: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -30,16 +31,19 @@ export const CookiesManager: React.FC = () => {
   const loadProfiles = async () => {
     setIsLoadingProfiles(true)
     setError(null)
-    try {
-      const fetched = await window.api.profiles.getAll()
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: 'Unable to load profiles',
+      fallbackMessage: 'Failed to load profiles.',
+      context: 'cookies.loadProfiles',
+      onError: (message) => setError(message)
+    })
+
+    if (fetched) {
       setProfiles(fetched)
       setSelectedProfileId((current) => current || fetched[0]?.id || '')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load profiles.'
-      setError(message)
-    } finally {
-      setIsLoadingProfiles(false)
     }
+
+    setIsLoadingProfiles(false)
   }
 
   const loadCookies = async (profileId: string, targetFormat: CookieFormat) => {
@@ -50,19 +54,24 @@ export const CookiesManager: React.FC = () => {
 
     setIsLoadingCookies(true)
     setError(null)
-    try {
-      const result = await window.api.cookies.read(profileId, targetFormat)
-      if (!result.success) {
-        throw new Error(result.error ?? 'Failed to read cookies.')
+    const result = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.read(profileId, targetFormat), 'Failed to read cookies.'),
+      {
+        title: 'Unable to load cookies',
+        fallbackMessage: 'Failed to load cookies.',
+        context: 'cookies.load',
+        onError: (message) => {
+          setError(message)
+          setCookies([])
+        }
       }
+    )
+
+    if (result) {
       setCookies(result.cookies)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load cookies.'
-      setError(message)
-      setCookies([])
-    } finally {
-      setIsLoadingCookies(false)
     }
+
+    setIsLoadingCookies(false)
   }
 
   useEffect(() => {
@@ -87,22 +96,35 @@ export const CookiesManager: React.FC = () => {
 
   const importCookieFile = async (file: File) => {
     if (!selectedProfileId) {
-      setError('Please select a profile before importing cookies.')
+      const message = 'Please select a profile before importing cookies.'
+      setError(message)
+      emitToast({ title: 'No profile selected', message, variant: 'warning' })
       return
     }
 
     setError(null)
-    const content = await file.text()
-    const importedFormat = detectFormat(file.name)
-    setFormat(importedFormat)
+    const imported = await runIpcAction(async () => {
+      const content = await file.text()
+      const importedFormat = detectFormat(file.name)
+      setFormat(importedFormat)
 
-    const result = await window.api.cookies.write(selectedProfileId, importedFormat, content)
-    if (!result.success) {
-      setError(result.error ?? 'Failed to import cookie file.')
-      return
+      ensureIpcSuccess(
+        await window.api.cookies.write(selectedProfileId, importedFormat, content),
+        'Failed to import cookie file.'
+      )
+
+      await loadCookies(selectedProfileId, importedFormat)
+      return true
+    }, {
+      title: 'Cookie import failed',
+      fallbackMessage: 'Failed to import cookie file.',
+      context: 'cookies.import',
+      onError: (message) => setError(message)
+    })
+
+    if (imported) {
+      emitToast({ title: 'Cookies imported', variant: 'success' })
     }
-
-    await loadCookies(selectedProfileId, importedFormat)
   }
 
   const handleDrop: React.DragEventHandler<HTMLDivElement> = (event) => {
@@ -133,46 +155,64 @@ export const CookiesManager: React.FC = () => {
 
   const handleExport = async () => {
     if (!selectedProfileId) {
-      setError('Please select a profile before exporting cookies.')
+      const message = 'Please select a profile before exporting cookies.'
+      setError(message)
+      emitToast({ title: 'No profile selected', message, variant: 'warning' })
       return
     }
 
-    try {
-      const result = await window.api.cookies.read(selectedProfileId, format)
-      if (!result.success) {
-        throw new Error(result.error ?? 'Failed to export cookies.')
+    const result = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.read(selectedProfileId, format), 'Failed to export cookies.'),
+      {
+        title: 'Cookie export failed',
+        fallbackMessage: 'Failed to export cookies.',
+        context: 'cookies.export',
+        onError: (message) => setError(message)
       }
+    )
 
-      const extension = format === 'json' ? 'json' : 'txt'
-      const profileName = (selectedProfile?.name ?? 'profile').replace(/\s+/g, '_')
-      const blob = new Blob([result.content], { type: 'text/plain;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${profileName}_cookies.${extension}`
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to export cookies.'
-      setError(message)
+    if (!result) {
+      return
     }
+
+    const extension = format === 'json' ? 'json' : 'txt'
+    const profileName = (selectedProfile?.name ?? 'profile').replace(/\s+/g, '_')
+    const blob = new Blob([result.content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${profileName}_cookies.${extension}`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    emitToast({ title: 'Cookies exported', variant: 'success' })
   }
 
   const handleClear = async () => {
     if (!selectedProfileId) {
-      setError('Please select a profile before clearing cookies.')
+      const message = 'Please select a profile before clearing cookies.'
+      setError(message)
+      emitToast({ title: 'No profile selected', message, variant: 'warning' })
       return
     }
 
-    const result = await window.api.cookies.clear(selectedProfileId)
-    if (!result.success) {
-      setError(result.error ?? 'Failed to clear cookies.')
+    const cleared = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.clear(selectedProfileId), 'Failed to clear cookies.'),
+      {
+        title: 'Cookie clear failed',
+        fallbackMessage: 'Failed to clear cookies.',
+        context: 'cookies.clear',
+        onError: (message) => setError(message)
+      }
+    )
+
+    if (!cleared) {
       return
     }
 
     setCookies([])
+    emitToast({ title: 'Cookies cleared', variant: 'success' })
   }
 
   return (

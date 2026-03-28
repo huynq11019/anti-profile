@@ -1,5 +1,6 @@
 import React from 'react'
 import { useDashboard } from '@renderer/hooks/useDashboard'
+import { handleIpcError } from '@renderer/utils/errorHandler'
 
 export const Dashboard: React.FC = () => {
   const { profiles, isLoading, error, handleLaunch, handleStop } = useDashboard()
@@ -11,9 +12,11 @@ export const Dashboard: React.FC = () => {
     try {
       await action()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Profile action failed.'
-      console.error(message)
-      window.alert(message)
+      handleIpcError(err, {
+        title: 'Profile action failed',
+        fallbackMessage: 'Unable to run profile action.',
+        context: 'dashboard.profileAction'
+      })
     }
   }
 

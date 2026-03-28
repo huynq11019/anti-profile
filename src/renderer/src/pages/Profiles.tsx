@@ -2,6 +2,7 @@ import React from 'react'
 import { Profile, Proxy } from '@shared/types'
 import { ProfileRow } from '@renderer/components/profiles/ProfileRow'
 import { useDashboard } from '@renderer/hooks/useDashboard'
+import { emitToast, runIpcAction } from '@renderer/utils/errorHandler'
 
 type BulkAction = 'open' | 'close' | 'assignProxy' | 'removeProxy' | 'assignProxyMap'
 
@@ -95,11 +96,14 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
 
   React.useEffect(() => {
     const loadDependencies = async () => {
-      try {
-        const fetchedProxies = await window.api.proxies.getAll()
+      const fetchedProxies = await runIpcAction(() => window.api.proxies.getAll(), {
+        title: 'Unable to load proxies',
+        fallbackMessage: 'Failed to load proxies.',
+        context: 'profiles.loadProxies'
+      })
+
+      if (fetchedProxies) {
         setAllProxies(fetchedProxies)
-      } catch (err) {
-        console.error('Failed to load proxies:', err)
       }
     }
 
@@ -133,18 +137,20 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
   ]
 
   const runProfileAction = async (action: () => Promise<void>) => {
-    try {
-      await action()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Profile action failed.'
-      console.error(message)
-      window.alert(message)
-    }
+    await runIpcAction(action, {
+      title: 'Profile action failed',
+      fallbackMessage: 'Unable to complete profile action.',
+      context: 'profiles.action'
+    })
   }
 
   const runBulkAction = async () => {
     if (selectedProfileIds.length === 0) {
-      window.alert('Select at least one profile before running a bulk action.')
+      emitToast({
+        title: 'No profile selected',
+        message: 'Select at least one profile before running a bulk action.',
+        variant: 'warning'
+      })
       return
     }
 
@@ -165,7 +171,11 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
         await handleBulkAssignProxy(selectedProfileIds, undefined)
       } else {
         if (allProxies.length === 0) {
-          window.alert('No proxies available. Create proxies first in Proxy Manager.')
+          emitToast({
+            title: 'No proxies available',
+            message: 'Create proxies first in Proxy Manager.',
+            variant: 'warning'
+          })
           return
         }
 
@@ -196,7 +206,12 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
     await runProfileAction(async () => {
       const zipPath = await handleExportZip(profile.id)
       if (zipPath) {
-        window.alert(`Profile exported successfully:\n${zipPath}`)
+        emitToast({
+          title: 'Profile exported',
+          message: zipPath,
+          variant: 'success',
+          durationMs: 5000
+        })
       }
     })
   }

@@ -1,6 +1,7 @@
 /// <reference path="../../../shared/types/window.d.ts" />
 import React, { useEffect, useMemo, useState } from 'react'
 import type { Profile, ProfileExtensionRecord } from '../../../shared/types'
+import { emitToast, ensureIpcSuccess, runIpcAction } from '../utils/errorHandler'
 
 export const ExtensionsManager: React.FC = () => {
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -18,9 +19,17 @@ export const ExtensionsManager: React.FC = () => {
   )
 
   const loadProfiles = async () => {
-    const fetched = await window.api.profiles.getAll()
-    setProfiles(fetched)
-    setSelectedProfileId((prev) => prev || fetched[0]?.id || '')
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: 'Unable to load profiles',
+      fallbackMessage: 'Failed to load profiles.',
+      context: 'extensions.loadProfiles',
+      onError: (message) => setError(message)
+    })
+
+    if (fetched) {
+      setProfiles(fetched)
+      setSelectedProfileId((prev) => prev || fetched[0]?.id || '')
+    }
   }
 
   const loadExtensions = async (profileId: string) => {
@@ -31,15 +40,18 @@ export const ExtensionsManager: React.FC = () => {
 
     setIsLoading(true)
     setError(null)
-    try {
-      const items = await window.api.extensions.list(profileId)
+    const items = await runIpcAction(() => window.api.extensions.list(profileId), {
+      title: 'Unable to load extensions',
+      fallbackMessage: 'Failed to load extensions.',
+      context: 'extensions.load',
+      onError: (message) => setError(message)
+    })
+
+    if (items) {
       setExtensions(items)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load extensions.'
-      setError(message)
-    } finally {
-      setIsLoading(false)
     }
+
+    setIsLoading(false)
   }
 
   useEffect(() => {
@@ -51,15 +63,25 @@ export const ExtensionsManager: React.FC = () => {
   }, [selectedProfileId])
 
   const runAction = async (action: () => Promise<{ success: boolean; error?: string }>) => {
-    setError(null)
-    const result = await action()
-    if (!result.success) {
-      setError(result.error ?? 'Extension action failed.')
-      return false
+    const result = await runIpcAction(async () => {
+      setError(null)
+      ensureIpcSuccess(await action(), 'Extension action failed.')
+
+      await loadExtensions(selectedProfileId)
+      return true
+    }, {
+      title: 'Extension action failed',
+      fallbackMessage: 'Unable to complete extension action.',
+      context: 'extensions.action',
+      onError: (message) => setError(message)
+    })
+
+    if (result) {
+      emitToast({ title: 'Extension updated', variant: 'success' })
+      return true
     }
 
-    await loadExtensions(selectedProfileId)
-    return true
+    return false
   }
 
   const onInstallUnpacked = async () => {

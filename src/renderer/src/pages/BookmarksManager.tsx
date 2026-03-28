@@ -1,6 +1,7 @@
 /// <reference path="../../../shared/types/window.d.ts" />
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { BookmarkRecord, Profile } from '../../../shared/types'
+import { emitToast, ensureIpcSuccess, runIpcAction } from '../utils/errorHandler'
 
 export const BookmarksManager: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -20,9 +21,17 @@ export const BookmarksManager: React.FC = () => {
   )
 
   const loadProfiles = async () => {
-    const fetched = await window.api.profiles.getAll()
-    setProfiles(fetched)
-    setSelectedProfileId((prev) => prev || fetched[0]?.id || '')
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: 'Unable to load profiles',
+      fallbackMessage: 'Failed to load profiles.',
+      context: 'bookmarks.loadProfiles',
+      onError: (message) => setError(message)
+    })
+
+    if (fetched) {
+      setProfiles(fetched)
+      setSelectedProfileId((prev) => prev || fetched[0]?.id || '')
+    }
   }
 
   const loadBookmarks = async (profileId: string) => {
@@ -33,15 +42,18 @@ export const BookmarksManager: React.FC = () => {
 
     setIsLoading(true)
     setError(null)
-    try {
-      const items = await window.api.bookmarks.list(profileId)
+    const items = await runIpcAction(() => window.api.bookmarks.list(profileId), {
+      title: 'Unable to load bookmarks',
+      fallbackMessage: 'Failed to load bookmarks.',
+      context: 'bookmarks.load',
+      onError: (message) => setError(message)
+    })
+
+    if (items) {
       setBookmarks(items)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load bookmarks.'
-      setError(message)
-    } finally {
-      setIsLoading(false)
     }
+
+    setIsLoading(false)
   }
 
   useEffect(() => {
@@ -56,51 +68,79 @@ export const BookmarksManager: React.FC = () => {
     if (!selectedProfileId) return
 
     setError(null)
-    const result = await window.api.bookmarks.add(selectedProfileId, {
-      title,
-      url,
-      folder: folder || undefined
+    const added = await runIpcAction(async () => {
+      ensureIpcSuccess(
+        await window.api.bookmarks.add(selectedProfileId, {
+          title,
+          url,
+          folder: folder || undefined
+        }),
+        'Failed to add bookmark.'
+      )
+
+      setTitle('')
+      setUrl('')
+      setFolder('')
+      await loadBookmarks(selectedProfileId)
+      return true
+    }, {
+      title: 'Add bookmark failed',
+      fallbackMessage: 'Failed to add bookmark.',
+      context: 'bookmarks.add',
+      onError: (message) => setError(message)
     })
 
-    if (!result.success) {
-      setError(result.error ?? 'Failed to add bookmark.')
-      return
+    if (added) {
+      emitToast({ title: 'Bookmark added', variant: 'success' })
     }
-
-    setTitle('')
-    setUrl('')
-    setFolder('')
-    await loadBookmarks(selectedProfileId)
   }
 
   const deleteBookmark = async (bookmarkId: string) => {
     if (!selectedProfileId) return
 
-    const result = await window.api.bookmarks.delete(selectedProfileId, bookmarkId)
-    if (!result.success) {
-      setError(result.error ?? 'Failed to delete bookmark.')
-      return
-    }
+    const removed = await runIpcAction(async () => {
+      ensureIpcSuccess(await window.api.bookmarks.delete(selectedProfileId, bookmarkId), 'Failed to delete bookmark.')
 
-    await loadBookmarks(selectedProfileId)
+      await loadBookmarks(selectedProfileId)
+      return true
+    }, {
+      title: 'Delete bookmark failed',
+      fallbackMessage: 'Failed to delete bookmark.',
+      context: 'bookmarks.delete',
+      onError: (message) => setError(message)
+    })
+
+    if (removed) {
+      emitToast({ title: 'Bookmark removed', variant: 'success' })
+    }
   }
 
   const importJson = async (content: string) => {
     if (!selectedProfileId) return
 
-    const result = await window.api.bookmarks.importJson(selectedProfileId, content)
-    if (!result.success) {
-      setError(result.error ?? 'Failed to import bookmarks.')
-      return
-    }
+    const imported = await runIpcAction(async () => {
+      ensureIpcSuccess(await window.api.bookmarks.importJson(selectedProfileId, content), 'Failed to import bookmarks.')
 
-    setJsonInput('')
-    await loadBookmarks(selectedProfileId)
+      setJsonInput('')
+      await loadBookmarks(selectedProfileId)
+      return true
+    }, {
+      title: 'Bookmark import failed',
+      fallbackMessage: 'Failed to import bookmarks.',
+      context: 'bookmarks.import',
+      onError: (message) => setError(message)
+    })
+
+    if (imported) {
+      emitToast({ title: 'Bookmarks imported', variant: 'success' })
+    }
   }
 
   const onImportFromText = async () => {
     if (!jsonInput.trim()) {
-      setError('Paste JSON content before importing.')
+      const message = 'Paste JSON content before importing.'
+      setError(message)
+      emitToast({ title: 'Missing JSON content', message, variant: 'warning' })
       return
     }
 

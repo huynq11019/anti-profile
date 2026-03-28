@@ -11,6 +11,8 @@ import { BookmarksManager } from '@renderer/pages/BookmarksManager'
 import { ExtensionsManager } from '@renderer/pages/ExtensionsManager'
 import { Settings } from '@renderer/pages/Settings'
 import { CreateProfileModal } from '@renderer/components/modals/CreateProfileModal'
+import { ToastViewport } from '@renderer/components/feedback/ToastViewport'
+import { emitToast, runIpcAction } from '@renderer/utils/errorHandler'
 import type { CreateProfileFormData } from '@renderer/components/modals/CreateProfileModal'
 import type { Profile } from '@shared/types'
 
@@ -45,29 +47,56 @@ const App: React.FC = () => {
           .filter(Boolean)
       : undefined
 
-    if (data.id) {
-      await window.api.profiles.update(data.id, {
-        name: data.name,
-        proxyId: data.proxyId || undefined,
-        userAgent: data.userAgent || undefined,
-        timezone: data.timezone || undefined,
-        note: data.note || undefined,
-        tags
-      })
-    } else {
-      await window.api.profiles.create({
-        name: data.name,
-        proxyId: data.proxyId || undefined,
-        userAgent: data.userAgent || undefined,
-        timezone: data.timezone || undefined,
-        note: data.note || undefined,
-        tags
-      })
+    const saved = await runIpcAction(async () => {
+      if (data.id) {
+        await window.api.profiles.update(data.id, {
+          name: data.name,
+          proxyId: data.proxyId || undefined,
+          userAgent: data.userAgent || undefined,
+          timezone: data.timezone || undefined,
+          note: data.note || undefined,
+          tags
+        })
+      } else {
+        await window.api.profiles.create({
+          name: data.name,
+          proxyId: data.proxyId || undefined,
+          userAgent: data.userAgent || undefined,
+          timezone: data.timezone || undefined,
+          note: data.note || undefined,
+          tags
+        })
+      }
+    }, {
+      title: data.id ? 'Unable to update profile' : 'Unable to create profile',
+      fallbackMessage: 'Profile save failed.',
+      context: 'profiles.save'
+    })
+
+    if (!saved) {
+      throw new Error('Profile save failed.')
     }
+
+    emitToast({ title: data.id ? 'Profile updated' : 'Profile created', variant: 'success' })
 
     window.dispatchEvent(new Event('profiles:changed'))
     setEditingProfile(null)
   }
+
+  React.useEffect(() => {
+    const unsubscribeUiAlert = window.api.onUiAlert((alert) => {
+      emitToast({
+        title: alert.level.toUpperCase(),
+        message: alert.text,
+        variant: alert.level === 'error' ? 'error' : alert.level === 'warning' ? 'warning' : 'info',
+        dedupeKey: `ui:alerts:${alert.level}:${alert.text}`
+      })
+    })
+
+    return () => {
+      unsubscribeUiAlert()
+    }
+  }, [])
 
   return (
     <BrowserRouter>
@@ -128,6 +157,8 @@ const App: React.FC = () => {
           initialProfile={editingProfile}
           onSubmit={handleCreateProfile}
         />
+
+        <ToastViewport />
       </div>
     </BrowserRouter>
   )
