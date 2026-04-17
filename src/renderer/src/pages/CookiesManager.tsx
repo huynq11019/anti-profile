@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { CookieFormat, CookieRecord, Profile } from '@shared/types'
 import { emitToast, ensureIpcSuccess, runIpcAction } from '@renderer/utils/errorHandler'
+import { EditCookieModal } from '@renderer/components/modals/EditCookieModal'
 
 export const CookiesManager: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const requestedProfileId = (searchParams.get('profileId') ?? '').trim()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true)
@@ -13,6 +17,9 @@ export const CookiesManager: React.FC = () => {
   const [isLoadingCookies, setIsLoadingCookies] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [editingCookie, setEditingCookie] = useState<CookieRecord | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeletingCookies, setIsDeletingCookies] = useState<Set<string>>(new Set())
 
   const filteredProfiles = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase()
@@ -40,9 +47,25 @@ export const CookiesManager: React.FC = () => {
 
     if (fetched) {
       setProfiles(fetched)
-      setSelectedProfileId((current) => current || fetched[0]?.id || '')
+      setSelectedProfileId((current) => {
+        const hasRequestedProfile = requestedProfileId.length > 0 && fetched.some((profile) => profile.id === requestedProfileId)
+        if (hasRequestedProfile) {
+          return requestedProfileId
+        }
+
+        const hasCurrentProfile = current.length > 0 && fetched.some((profile) => profile.id === current)
+        if (hasCurrentProfile) {
+          return current
+        }
+
+        return fetched[0]?.id || ''
+      })
+      setIsLoadingProfiles(false)
+      return
     }
 
+    setProfiles([])
+    setSelectedProfileId('')
     setIsLoadingProfiles(false)
   }
 
@@ -76,7 +99,7 @@ export const CookiesManager: React.FC = () => {
 
   useEffect(() => {
     void loadProfiles()
-  }, [])
+  }, [requestedProfileId])
 
   useEffect(() => {
     if (!selectedProfileId) {
@@ -215,6 +238,62 @@ export const CookiesManager: React.FC = () => {
     emitToast({ title: 'Cookies cleared', variant: 'success' })
   }
 
+  const handleEditCookie = (cookie: CookieRecord) => {
+    setEditingCookie(cookie)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteCookie = async (cookie: CookieRecord) => {
+    if (!selectedProfileId) {
+      emitToast({ title: 'No profile selected', variant: 'warning' })
+      return
+    }
+
+    const cookieKey = `${cookie.domain}-${cookie.name}`
+    setIsDeletingCookies((prev) => new Set([...prev, cookieKey]))
+
+    try {
+      const result = await window.api.cookies.delete({
+        profileId: selectedProfileId,
+        domain: cookie.domain,
+        name: cookie.name
+      })
+
+      if (!result.success) {
+        throw new Error(result.error ?? 'Failed to delete cookie')
+      }
+
+      // Reload cookies after successful delete
+      await loadCookies(selectedProfileId, format)
+      emitToast({
+        title: 'Cookie deleted',
+        message: `${cookie.name} has been deleted.`,
+        variant: 'success'
+      })
+    } catch (error) {
+      emitToast({
+        title: 'Delete failed',
+        message: error instanceof Error ? error.message : 'Failed to delete cookie',
+        variant: 'error'
+      })
+    } finally {
+      setIsDeletingCookies((prev) => {
+        const updated = new Set(prev)
+        updated.delete(cookieKey)
+        return updated
+      })
+    }
+  }
+
+  const handleModalClose = () => {
+    setIsEditModalOpen(false)
+    setEditingCookie(null)
+  }
+
+  const handleEditSuccess = async () => {
+    await loadCookies(selectedProfileId, format)
+  }
+
   return (
     <div className="h-full flex flex-col pt-4">
       <div className="px-8 pb-4 border-b border-white/[0.05] shrink-0">
@@ -337,14 +416,16 @@ export const CookiesManager: React.FC = () => {
                   <th className="px-4 py-2 text-on-surface-variant font-semibold">Domain</th>
                   <th className="px-4 py-2 text-on-surface-variant font-semibold">Name</th>
                   <th className="px-4 py-2 text-on-surface-variant font-semibold">Value</th>
-                  <th className="px-4 py-2 text-on-surface-variant font-semibold w-24">Path</th>
-                  <th className="px-4 py-2 text-on-surface-variant font-semibold w-24">Expires</th>
+                  <th className="px-4 py-2 text-on-surface-variant font-semibold w-20">Path</th>
+                  <th className="px-4 py-2 text-on-surface-variant font-semibold w-28">Expires</th>
+                  <th className="px-4 py-2 text-on-surface-variant font-semibold w-32">Flags</th>
+                  <th className="px-4 py-2 text-on-surface-variant font-semibold text-center w-20">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.05]">
                 {isLoadingCookies && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
+                    <td colSpan={7} className="px-4 py-8 text-center text-on-surface-variant">
                       Loading cookies...
                     </td>
                   </tr>
@@ -352,30 +433,92 @@ export const CookiesManager: React.FC = () => {
 
                 {!isLoadingCookies && cookies.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-on-surface-variant">
+                    <td colSpan={7} className="px-4 py-8 text-center text-on-surface-variant">
                       No cookies available for this profile and format.
                     </td>
                   </tr>
                 )}
 
                 {!isLoadingCookies &&
-                  cookies.map((cookie, index) => (
-                    <tr key={`${cookie.domain}-${cookie.name}-${index}`} className="hover:bg-surface-bright/30">
-                      <td className="px-4 py-3 text-secondary">{cookie.domain}</td>
-                      <td className="px-4 py-3 text-primary">{cookie.name}</td>
-                      <td className="px-4 py-3 text-on-surface-variant truncate max-w-[150px]">{cookie.value}</td>
-                      <td className="px-4 py-3 text-on-surface-variant">{cookie.path || '/'}</td>
-                      <td className="px-4 py-3 text-on-surface-variant opacity-50">
-                        {cookie.expires > 0 ? new Date(cookie.expires * 1000).toLocaleDateString() : 'Session'}
-                      </td>
-                    </tr>
-                  ))}
+                  cookies.map((cookie, index) => {
+                    const cookieKey = `${cookie.domain}-${cookie.name}`
+                    const isDeleting = isDeletingCookies.has(cookieKey)
+                    return (
+                      <tr key={`${cookieKey}-${index}`} className="hover:bg-surface-bright/30">
+                        <td className="px-4 py-3 text-secondary break-all max-w-[150px]">{cookie.domain}</td>
+                        <td className="px-4 py-3 text-primary font-mono">{cookie.name}</td>
+                        <td className="px-4 py-3 text-on-surface-variant break-all max-w-[200px]">
+                          <code className="bg-surface-container-lowest/50 px-2 py-1 rounded text-[10px]">
+                            {cookie.value}
+                          </code>
+                        </td>
+                        <td className="px-4 py-3 text-on-surface-variant text-xs">{cookie.path || '/'}</td>
+                        <td className="px-4 py-3 text-on-surface-variant text-xs opacity-75">
+                          {cookie.expires > 0 ? new Date(cookie.expires * 1000).toLocaleDateString() : 'Session'}
+                        </td>
+                        <td className="px-4 py-3 text-on-surface-variant text-xs">
+                          <div className="flex gap-1 flex-wrap">
+                            {cookie.secure && (
+                              <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-semibold">
+                                Secure
+                              </span>
+                            )}
+                            {cookie.httpOnly && (
+                              <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded text-[10px] font-semibold">
+                                HttpOnly
+                              </span>
+                            )}
+                            {cookie.sameSite && (
+                              <span className="bg-tertiary/20 text-tertiary px-2 py-0.5 rounded text-[10px] font-semibold">
+                                {cookie.sameSite}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex gap-1 justify-center">
+                            <button
+                              onClick={() => handleEditCookie(cookie)}
+                              disabled={isDeleting}
+                              className="p-1.5 rounded text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Edit cookie"
+                              aria-label="Edit cookie"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCookie(cookie)}
+                              disabled={isDeleting}
+                              className="p-1.5 rounded text-error hover:bg-error/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete cookie"
+                              aria-label="Delete cookie"
+                            >
+                              {isDeleting ? (
+                                <span className="material-symbols-outlined text-[16px] animate-spin">hourglass_top</span>
+                              ) : (
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>
         </div>
 
       </div>
+
+      {/* Edit Cookie Modal */}
+      <EditCookieModal
+        isOpen={isEditModalOpen}
+        onClose={handleModalClose}
+        cookie={editingCookie}
+        profileId={selectedProfileId}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   )
 }

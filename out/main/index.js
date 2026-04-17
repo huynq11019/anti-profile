@@ -418,6 +418,8 @@ const IPC_CHANNELS = {
   COOKIES_READ: "cookies:read",
   COOKIES_WRITE: "cookies:write",
   COOKIES_CLEAR: "cookies:clear",
+  COOKIES_EDIT: "cookies:edit",
+  COOKIES_DELETE: "cookies:delete",
   BOOKMARKS_LIST: "bookmarks:list",
   BOOKMARKS_ADD: "bookmarks:add",
   BOOKMARKS_DELETE: "bookmarks:delete",
@@ -1722,12 +1724,68 @@ function ensureProfileExists(profileId) {
     throw new Error(`Profile not found: ${profileId}`);
   }
 }
+function editCookieInChromiumDb(profileId, domain, oldName, newCookie) {
+  const result = withCookieDb(profileId, (db2) => {
+    const tableExists = db2.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'").get();
+    if (!tableExists) {
+      return false;
+    }
+    const columns = getCookiesTableColumns(db2);
+    const nowChromium = toChromiumTimestamp(Math.trunc(Date.now() / 1e3));
+    const edit = db2.transaction(() => {
+      const deleteStatement = db2.prepare("DELETE FROM cookies WHERE host_key = ? AND name = ?");
+      deleteStatement.run(domain, oldName);
+      const valuesByColumn = {
+        creation_utc: nowChromium,
+        host_key: domain,
+        name: newCookie.name,
+        value: newCookie.value,
+        path: newCookie.path || "/",
+        expires_utc: toChromiumTimestamp(newCookie.expires),
+        is_secure: newCookie.secure ? 1 : 0,
+        is_httponly: newCookie.httpOnly ? 1 : 0,
+        last_access_utc: nowChromium,
+        has_expires: newCookie.expires > 0 ? 1 : 0,
+        is_persistent: newCookie.expires > 0 ? 1 : 0,
+        priority: 1,
+        samesite: toChromiumSameSite(newCookie.sameSite),
+        source_scheme: newCookie.secure ? 2 : 1,
+        source_port: 443,
+        last_update_utc: nowChromium,
+        source_type: 0,
+        is_same_party: 0,
+        same_party_context: 0
+      };
+      const insertColumns = Object.keys(valuesByColumn).filter((column) => columns.has(column));
+      const placeholders = insertColumns.map(() => "?").join(", ");
+      const insertSql = `INSERT INTO cookies (${insertColumns.join(", ")}) VALUES (${placeholders})`;
+      const insertValues = insertColumns.map((column) => valuesByColumn[column]);
+      db2.prepare(insertSql).run(...insertValues);
+    });
+    edit();
+    return true;
+  });
+  return Boolean(result);
+}
+function deleteCookieFromChromiumDb(profileId, domain, name) {
+  const result = withCookieDb(profileId, (db2) => {
+    const tableExists = db2.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'").get();
+    if (!tableExists) {
+      return false;
+    }
+    const deleteStatement = db2.prepare("DELETE FROM cookies WHERE host_key = ? AND name = ?");
+    deleteStatement.run(domain, name);
+    return true;
+  });
+  return Boolean(result);
+}
 function setupCookieHandlers() {
   electron.ipcMain.handle(IPC_CHANNELS.COOKIES_READ, async (_event, profileId, format) => {
     try {
       ensureProfileExists(profileId);
       const chromiumCookies = readCookiesFromChromiumDb(profileId);
-      if (chromiumCookies) {
+      if (chromiumCookies !== null && chromiumCookies.length > 0) {
+        console.log(`[Cookies] Loading ${chromiumCookies.length} cookies from Chromium DB for profile ${profileId}`);
         return {
           success: true,
           format,
@@ -1737,13 +1795,17 @@ function setupCookieHandlers() {
       }
       const filePath = getCookieFilePath(profileId, format);
       if (!fs.existsSync(filePath)) {
+        console.log(`[Cookies] No cookies found for profile ${profileId} (no DB, no file)`);
         return { success: true, format, cookies: [], content: "" };
       }
+      console.log(`[Cookies] Loading cookies from file for profile ${profileId}: ${filePath}`);
       const content = fs.readFileSync(filePath, "utf8");
       const cookies = parseCookies(content, format);
+      console.log(`[Cookies] Loaded ${cookies.length} cookies from file (${format} format)`);
       return { success: true, format, cookies, content };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Cookies] Error reading cookies for profile ${profileId}: ${message}`);
       return { success: false, format, cookies: [], content: "", error: message };
     }
   });
@@ -1780,6 +1842,49 @@ function setupCookieHandlers() {
       return { success: false, count: 0, error: message };
     }
   });
+  electron.ipcMain.handle(
+    IPC_CHANNELS.COOKIES_EDIT,
+    async (_event, payload) => {
+      try {
+        ensureProfileExists(payload.profileId);
+        await stopProfiles([payload.profileId]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const success = editCookieInChromiumDb(
+          payload.profileId,
+          payload.domain,
+          payload.oldName,
+          payload.newCookie
+        );
+        if (!success) {
+          return { success: false, error: "Failed to edit cookie in database" };
+        }
+        await launchProfiles([payload.profileId], profileRepo$2);
+        return { success: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message };
+      }
+    }
+  );
+  electron.ipcMain.handle(
+    IPC_CHANNELS.COOKIES_DELETE,
+    async (_event, payload) => {
+      try {
+        ensureProfileExists(payload.profileId);
+        await stopProfiles([payload.profileId]);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const success = deleteCookieFromChromiumDb(payload.profileId, payload.domain, payload.name);
+        if (!success) {
+          return { success: false, error: "Failed to delete cookie from database" };
+        }
+        await launchProfiles([payload.profileId], profileRepo$2);
+        return { success: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message };
+      }
+    }
+  );
 }
 function toBookmark(row) {
   return {

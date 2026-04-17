@@ -8219,6 +8219,28 @@ function shouldProcessLinkClick(event, target) {
   (!target || target === "_self") && // Let browser handle "target=_blank" etc.
   !isModifiedEvent(event);
 }
+function createSearchParams(init) {
+  if (init === void 0) {
+    init = "";
+  }
+  return new URLSearchParams(typeof init === "string" || Array.isArray(init) || init instanceof URLSearchParams ? init : Object.keys(init).reduce((memo, key) => {
+    let value = init[key];
+    return memo.concat(Array.isArray(value) ? value.map((v2) => [key, v2]) : [[key, value]]);
+  }, []));
+}
+function getSearchParamsForLocation(locationSearch, defaultSearchParams) {
+  let searchParams = createSearchParams(locationSearch);
+  if (defaultSearchParams) {
+    defaultSearchParams.forEach((_, key) => {
+      if (!searchParams.has(key)) {
+        defaultSearchParams.getAll(key).forEach((value) => {
+          searchParams.append(key, value);
+        });
+      }
+    });
+  }
+  return searchParams;
+}
 const _excluded = ["onClick", "relative", "reloadDocument", "replace", "state", "target", "to", "preventScrollReset", "viewTransition"], _excluded2 = ["aria-current", "caseSensitive", "className", "end", "style", "to", "viewTransition", "children"];
 const REACT_ROUTER_VERSION = "6";
 try {
@@ -8434,6 +8456,24 @@ function useLinkClickHandler(to, _temp) {
     }
   }, [location, navigate, path, replaceProp, state, target, to, preventScrollReset, relative, viewTransition]);
 }
+function useSearchParams(defaultInit) {
+  let defaultSearchParamsRef = reactExports.useRef(createSearchParams(defaultInit));
+  let hasSetSearchParamsRef = reactExports.useRef(false);
+  let location = useLocation();
+  let searchParams = reactExports.useMemo(() => (
+    // Only merge in the defaults if we haven't yet called setSearchParams.
+    // Once we call that we want those to take precedence, otherwise you can't
+    // remove a param with setSearchParams({}) if it has an initial value
+    getSearchParamsForLocation(location.search, hasSetSearchParamsRef.current ? null : defaultSearchParamsRef.current)
+  ), [location.search]);
+  let navigate = useNavigate();
+  let setSearchParams = reactExports.useCallback((nextInit, navigateOptions) => {
+    const newSearchParams = createSearchParams(typeof nextInit === "function" ? nextInit(searchParams) : nextInit);
+    hasSetSearchParamsRef.current = true;
+    navigate("?" + newSearchParams, navigateOptions);
+  }, [navigate, searchParams]);
+  return [searchParams, setSearchParams];
+}
 function useViewTransitionState(to, opts) {
   if (opts === void 0) {
     opts = {};
@@ -8581,6 +8621,74 @@ const Sidebar = ({ className = "" }) => {
     }
   );
 };
+const APP_TOAST_EVENT = "app:toast";
+const DEFAULT_TOAST_DEDUPE_WINDOW_MS = 2200;
+const recentToastTimestamps = /* @__PURE__ */ new Map();
+function getErrorMessage(error, fallbackMessage = "Unexpected error.") {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+  return fallbackMessage;
+}
+function emitToast(detail) {
+  const variant = detail.variant ?? "info";
+  const dedupeWindowMs = Math.max(0, detail.dedupeWindowMs ?? DEFAULT_TOAST_DEDUPE_WINDOW_MS);
+  const dedupeKey = detail.dedupeKey?.trim() || `${variant}|${detail.title.trim()}|${(detail.message ?? "").trim()}`;
+  if (dedupeWindowMs > 0) {
+    const now = Date.now();
+    const previousTimestamp = recentToastTimestamps.get(dedupeKey);
+    if (previousTimestamp !== void 0 && now - previousTimestamp < dedupeWindowMs) {
+      return;
+    }
+    recentToastTimestamps.set(dedupeKey, now);
+    for (const [key, timestamp] of recentToastTimestamps.entries()) {
+      if (now - timestamp > dedupeWindowMs * 2) {
+        recentToastTimestamps.delete(key);
+      }
+    }
+  }
+  window.dispatchEvent(new CustomEvent(APP_TOAST_EVENT, { detail }));
+}
+function handleIpcError(error, options) {
+  const message = getErrorMessage(error, options?.fallbackMessage ?? "IPC request failed.");
+  const title = options?.title ?? "Action failed";
+  if (options?.context) {
+    console.error(`[IPC:${options.context}] ${message}`, error);
+  } else {
+    console.error("[IPC]", message, error);
+  }
+  if (!options?.silent) {
+    emitToast({
+      title,
+      message,
+      variant: options?.variant ?? "error",
+      durationMs: options?.durationMs,
+      dedupeKey: options?.dedupeKey,
+      dedupeWindowMs: options?.dedupeWindowMs
+    });
+  }
+  return message;
+}
+function ensureIpcSuccess(result, fallbackMessage = "IPC request failed.") {
+  if (result.success) {
+    return result;
+  }
+  const bulkErrors = result.errors?.filter(Boolean).join(", ");
+  const message = bulkErrors || result.error || fallbackMessage;
+  throw new Error(message);
+}
+async function runIpcAction(action, options) {
+  try {
+    return await action();
+  } catch (error) {
+    const message = handleIpcError(error, options);
+    options?.onError?.(message, error);
+    return null;
+  }
+}
 const useDashboard = () => {
   const [profiles, setProfiles] = reactExports.useState([]);
   const [selectedIds, setSelectedIds] = reactExports.useState(/* @__PURE__ */ new Set());
@@ -8590,15 +8698,16 @@ const useDashboard = () => {
   const loadProfiles = reactExports.useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const fetched = await window.api.profiles.getAll();
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: "Unable to load profiles",
+      fallbackMessage: "Failed to fetch profiles.",
+      context: "dashboard.loadProfiles",
+      onError: (message) => setError(message)
+    });
+    if (fetched) {
       setProfiles(fetched);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to fetch profiles.";
-      setError(message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   }, []);
   reactExports.useEffect(() => {
     const onProfilesChanged = () => {
@@ -8615,6 +8724,12 @@ const useDashboard = () => {
       );
       if (state.status === "error" && state.error) {
         setError(state.error);
+        emitToast({
+          title: "Profile runtime error",
+          message: state.error,
+          variant: "error",
+          dedupeKey: `profile-status-error:${state.profileId}:${state.error}`
+        });
       }
     });
     void loadProfiles();
@@ -8645,22 +8760,14 @@ const useDashboard = () => {
     [filteredProfiles]
   );
   const handleLaunch = reactExports.useCallback(async (id2) => {
-    const result = await window.api.profiles.start([id2]);
-    if (!result.success) {
-      const launchErrors = result.errors?.join(", ") ?? "Unknown launch error.";
-      throw new Error(launchErrors);
-    }
+    ensureIpcSuccess(await window.api.profiles.start([id2]), "Unknown launch error.");
     setProfiles((prev) => {
       const now = (/* @__PURE__ */ new Date()).toISOString();
       return prev.map((p2) => p2.id === id2 ? { ...p2, status: "running", lastOpened: now } : p2);
     });
   }, []);
   const handleStop = reactExports.useCallback(async (id2) => {
-    const result = await window.api.profiles.stop([id2]);
-    if (!result.success) {
-      const stopErrors = result.errors?.join(", ") ?? "Unknown stop error.";
-      throw new Error(stopErrors);
-    }
+    ensureIpcSuccess(await window.api.profiles.stop([id2]), "Unknown stop error.");
     setProfiles((prev) => prev.map((p2) => p2.id === id2 ? { ...p2, status: "idle" } : p2));
   }, []);
   const handleDelete = reactExports.useCallback(async (id2) => {
@@ -8681,46 +8788,28 @@ const useDashboard = () => {
     await loadProfiles();
   }, [loadProfiles, profiles]);
   const handleOpenFolder = reactExports.useCallback(async (id2) => {
-    const result = await window.api.profiles.openFolder(id2);
-    if (!result.success) {
-      throw new Error(result.error ?? "Failed to open profile folder.");
-    }
+    ensureIpcSuccess(await window.api.profiles.openFolder(id2), "Failed to open profile folder.");
   }, []);
   const handleQuickUpdate = reactExports.useCallback(async (id2, updates) => {
     const updated = await window.api.profiles.update(id2, updates);
     setProfiles((prev) => prev.map((profile) => profile.id === id2 ? { ...profile, ...updated } : profile));
   }, []);
   const handleExportZip = reactExports.useCallback(async (id2) => {
-    const result = await window.api.profiles.exportZip(id2);
-    if (!result.success) {
-      throw new Error(result.error ?? "Failed to export profile ZIP.");
-    }
+    const result = ensureIpcSuccess(await window.api.profiles.exportZip(id2), "Failed to export profile ZIP.");
     return result.path;
   }, []);
   const handleBulkOpen = reactExports.useCallback(async (profileIds) => {
-    const result = await window.api.profiles.bulkOpen(profileIds);
-    if (!result.success) {
-      throw new Error(result.errors?.join(", ") ?? "Bulk open failed.");
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkOpen(profileIds), "Bulk open failed.");
   }, []);
   const handleBulkClose = reactExports.useCallback(async (profileIds) => {
-    const result = await window.api.profiles.bulkClose(profileIds);
-    if (!result.success) {
-      throw new Error(result.errors?.join(", ") ?? "Bulk close failed.");
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkClose(profileIds), "Bulk close failed.");
   }, []);
   const handleBulkAssignProxy = reactExports.useCallback(async (profileIds, proxyId) => {
-    const result = await window.api.profiles.bulkAssignProxy(profileIds, proxyId);
-    if (!result.success) {
-      throw new Error(result.errors?.join(", ") ?? "Bulk proxy assign failed.");
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkAssignProxy(profileIds, proxyId), "Bulk proxy assign failed.");
     setProfiles((prev) => prev.map((profile) => profileIds.includes(profile.id) ? { ...profile, proxyId } : profile));
   }, []);
   const handleBulkAssignProxyMap = reactExports.useCallback(async (profileProxyMap) => {
-    const result = await window.api.profiles.bulkAssignProxyMap(profileProxyMap);
-    if (!result.success) {
-      throw new Error(result.errors?.join(", ") ?? "Bulk proxy map assign failed.");
-    }
+    ensureIpcSuccess(await window.api.profiles.bulkAssignProxyMap(profileProxyMap), "Bulk proxy map assign failed.");
     setProfiles(
       (prev) => prev.map(
         (profile) => Object.prototype.hasOwnProperty.call(profileProxyMap, profile.id) ? { ...profile, proxyId: profileProxyMap[profile.id] } : profile
@@ -8763,9 +8852,11 @@ const Dashboard = () => {
     try {
       await action();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Profile action failed.";
-      console.error(message);
-      window.alert(message);
+      handleIpcError(err, {
+        title: "Profile action failed",
+        fallbackMessage: "Unable to run profile action.",
+        context: "dashboard.profileAction"
+      });
     }
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-8 max-w-[1200px] mx-auto h-full flex flex-col gap-6", children: [
@@ -8833,6 +8924,8 @@ const ProfileRow = ({
   onStop,
   onTogglePin,
   onOpenFolder,
+  onOpenExtensions,
+  onViewCookies,
   onExportZip,
   onEdit,
   onDelete
@@ -8879,6 +8972,8 @@ const ProfileRow = ({
   const menuItems = [
     { key: "edit", label: "Edit details", icon: "edit", action: () => onEdit(profile) },
     { key: "pin", label: profile.isPinned ? "Unpin profile" : "Pin profile", icon: "push_pin", action: () => onTogglePin(profile.id) },
+    { key: "extensions", label: "Install extension", icon: "extension", action: () => onOpenExtensions(profile.id) },
+    { key: "cookies", label: "View cookies", icon: "cookie", action: () => onViewCookies(profile.id) },
     { key: "folder", label: "Open profile folder", icon: "folder_open", action: () => onOpenFolder(profile.id) },
     { key: "zip", label: "Export profile ZIP", icon: "download", action: () => onExportZip(profile) },
     { key: "delete", label: "Delete profile", icon: "delete", action: () => onDelete(profile.id), danger: true }
@@ -8984,6 +9079,7 @@ const ProfileRow = ({
   );
 };
 const Profiles = ({ onCreateProfile, onEditProfile }) => {
+  const navigate = useNavigate();
   const [bulkAction, setBulkAction] = React.useState("open");
   const [allProxies, setAllProxies] = React.useState([]);
   const [showProxyMapModal, setShowProxyMapModal] = React.useState(false);
@@ -9053,11 +9149,13 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
   }, [searchQuery]);
   React.useEffect(() => {
     const loadDependencies = async () => {
-      try {
-        const fetchedProxies = await window.api.proxies.getAll();
+      const fetchedProxies = await runIpcAction(() => window.api.proxies.getAll(), {
+        title: "Unable to load proxies",
+        fallbackMessage: "Failed to load proxies.",
+        context: "profiles.loadProxies"
+      });
+      if (fetchedProxies) {
         setAllProxies(fetchedProxies);
-      } catch (err) {
-        console.error("Failed to load proxies:", err);
       }
     };
     void loadDependencies();
@@ -9087,17 +9185,19 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
     }
   ];
   const runProfileAction = async (action) => {
-    try {
-      await action();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Profile action failed.";
-      console.error(message);
-      window.alert(message);
-    }
+    await runIpcAction(action, {
+      title: "Profile action failed",
+      fallbackMessage: "Unable to complete profile action.",
+      context: "profiles.action"
+    });
   };
   const runBulkAction = async () => {
     if (selectedProfileIds.length === 0) {
-      window.alert("Select at least one profile before running a bulk action.");
+      emitToast({
+        title: "No profile selected",
+        message: "Select at least one profile before running a bulk action.",
+        variant: "warning"
+      });
       return;
     }
     await runProfileAction(async () => {
@@ -9116,7 +9216,11 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
         await handleBulkAssignProxy(selectedProfileIds, void 0);
       } else {
         if (allProxies.length === 0) {
-          window.alert("No proxies available. Create proxies first in Proxy Manager.");
+          emitToast({
+            title: "No proxies available",
+            message: "Create proxies first in Proxy Manager.",
+            variant: "warning"
+          });
           return;
         }
         const draft = {};
@@ -9142,10 +9246,20 @@ const Profiles = ({ onCreateProfile, onEditProfile }) => {
     await runProfileAction(async () => {
       const zipPath = await handleExportZip(profile.id);
       if (zipPath) {
-        window.alert(`Profile exported successfully:
-${zipPath}`);
+        emitToast({
+          title: "Profile exported",
+          message: zipPath,
+          variant: "success",
+          durationMs: 5e3
+        });
       }
     });
+  };
+  const openExtensionsForProfile = (profileId) => {
+    navigate(`/extensions?profileId=${encodeURIComponent(profileId)}`);
+  };
+  const openCookiesForProfile = (profileId) => {
+    navigate(`/cookies?profileId=${encodeURIComponent(profileId)}`);
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col h-full", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -9298,6 +9412,8 @@ ${zipPath}`);
                 onOpenFolder: (id2) => {
                   void runProfileAction(() => handleOpenFolder(id2));
                 },
+                onOpenExtensions: openExtensionsForProfile,
+                onViewCookies: openCookiesForProfile,
                 onExportZip: (profile2) => {
                   void runExportZip(profile2);
                 },
@@ -9611,7 +9727,271 @@ const Automation = () => {
     ] })
   ] });
 };
+const EditCookieModal = ({
+  isOpen,
+  onClose,
+  cookie,
+  profileId,
+  onSuccess
+}) => {
+  const overlayRef = reactExports.useRef(null);
+  const [isLoading, setIsLoading] = reactExports.useState(false);
+  const [formData, setFormData] = reactExports.useState({
+    name: "",
+    value: "",
+    domain: "",
+    path: "/",
+    expires: 0,
+    secure: false,
+    httpOnly: false,
+    sameSite: void 0
+  });
+  reactExports.useEffect(() => {
+    if (!isOpen || !cookie) return;
+    setFormData({
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path || "/",
+      expires: cookie.expires,
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      sameSite: cookie.sameSite
+    });
+  }, [isOpen, cookie]);
+  reactExports.useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isOpen, onClose]);
+  if (!isOpen || !cookie) return null;
+  const handleOverlayClick = (e) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const result = await window.api.cookies.edit({
+        profileId,
+        domain: cookie.domain,
+        oldName: cookie.name,
+        newCookie: formData
+      });
+      if (!result.success) {
+        throw new Error(result.error ?? "Failed to edit cookie");
+      }
+      emitToast({
+        title: "Cookie updated",
+        message: `${formData.name} has been updated.`,
+        variant: "success"
+      });
+      await Promise.resolve(onSuccess?.());
+      onClose();
+    } catch (error) {
+      handleIpcError(error, {
+        title: "Cookie edit failed",
+        fallbackMessage: "Unable to edit cookie.",
+        context: "modal.cookieEdit",
+        silent: false
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const expiresDate = formData.expires > 0 ? new Date(formData.expires * 1e3).toISOString().split("T")[0] : "";
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "div",
+    {
+      ref: overlayRef,
+      onClick: handleOverlayClick,
+      className: "fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm",
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "div",
+        {
+          className: "w-[600px] max-h-[90vh] overflow-y-auto bg-surface-container-high \n          border border-outline-variant/20 rounded-lg shadow-[0_0_60px_rgba(0,0,0,0.6)]",
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-label": "Edit Cookie",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between px-8 py-5 border-b border-white/[0.05]", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-lg font-bold text-on-surface", children: "Edit Cookie" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-on-surface-variant text-xs mt-0.5", children: [
+                  "Modify cookie properties for ",
+                  cookie.domain
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  onClick: onClose,
+                  disabled: isLoading,
+                  className: "p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright \n              rounded transition-colors disabled:opacity-50",
+                  "aria-label": "Close modal",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined", children: "close" })
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { onSubmit: handleSubmit, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-8 py-6 space-y-6", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Cookie Name *" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "text",
+                      value: formData.name,
+                      onChange: (e) => setFormData({ ...formData, name: e.target.value }),
+                      placeholder: "e.g. session_id",
+                      required: true,
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary focus:shadow-glow transition-all"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Cookie Value *" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "textarea",
+                    {
+                      value: formData.value,
+                      onChange: (e) => setFormData({ ...formData, value: e.target.value }),
+                      placeholder: "e.g. abc123xyz...",
+                      required: true,
+                      rows: 3,
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary focus:shadow-glow transition-all resize-none"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Domain (Read-only)" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "text",
+                      value: formData.domain,
+                      disabled: true,
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface-variant opacity-60 cursor-not-allowed"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-on-surface-variant/70 mt-1", children: "Domain cannot be changed. Delete and re-add the cookie if you need a different domain." })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Path" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "text",
+                      value: formData.path,
+                      onChange: (e) => setFormData({ ...formData, path: e.target.value || "/" }),
+                      placeholder: "/",
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant\n                  focus:outline-none focus:ring-1 focus:ring-primary focus:shadow-glow transition-all"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "Expiry Date (leave empty for session cookie)" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "input",
+                    {
+                      type: "date",
+                      value: expiresDate,
+                      onChange: (e) => {
+                        if (!e.target.value) {
+                          setFormData({ ...formData, expires: 0 });
+                        } else {
+                          const timestamp = Math.floor(new Date(e.target.value).getTime() / 1e3);
+                          setFormData({ ...formData, expires: timestamp });
+                        }
+                      },
+                      className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                  rounded px-4 py-2.5 text-sm text-on-surface\n                  focus:outline-none focus:ring-1 focus:ring-primary focus:shadow-glow transition-all"
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-3 gap-4 pt-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center gap-3 cursor-pointer", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        type: "checkbox",
+                        checked: formData.secure,
+                        onChange: (e) => setFormData({ ...formData, secure: e.target.checked }),
+                        className: "w-4 h-4 rounded border-outline-variant/30 text-primary cursor-pointer"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm text-on-surface-variant", children: "Secure (HTTPS only)" })
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center gap-3 cursor-pointer", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      "input",
+                      {
+                        type: "checkbox",
+                        checked: formData.httpOnly,
+                        onChange: (e) => setFormData({ ...formData, httpOnly: e.target.checked }),
+                        className: "w-4 h-4 rounded border-outline-variant/30 text-primary cursor-pointer"
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-sm text-on-surface-variant", children: "HttpOnly" })
+                  ] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2", children: "SameSite" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                      "select",
+                      {
+                        value: formData.sameSite ?? "",
+                        onChange: (e) => {
+                          const value = e.target.value;
+                          setFormData({ ...formData, sameSite: value || void 0 });
+                        },
+                        className: "w-full bg-surface-container-highest border border-outline-variant/30 \n                    rounded px-3 py-2 text-sm text-on-surface\n                    focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all",
+                        children: [
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "", children: "None" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "Strict", children: "Strict" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "Lax", children: "Lax" }),
+                          /* @__PURE__ */ jsxRuntimeExports.jsx("option", { value: "None", children: "None" })
+                        ]
+                      }
+                    )
+                  ] })
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-end gap-3 px-8 py-5 border-t border-white/[0.05]", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: onClose,
+                    disabled: isLoading,
+                    className: "px-6 py-2 rounded text-sm font-medium text-on-surface-variant \n                hover:bg-surface-bright/30 transition-colors disabled:opacity-50",
+                    children: "Cancel"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  "button",
+                  {
+                    type: "submit",
+                    disabled: isLoading,
+                    className: "px-6 py-2 rounded text-sm font-medium bg-primary text-on-primary \n                hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2",
+                    children: [
+                      isLoading && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "animate-spin material-symbols-outlined text-[16px]", children: "hourglass_top" }),
+                      isLoading ? "Saving..." : "Save Changes"
+                    ]
+                  }
+                )
+              ] })
+            ] })
+          ]
+        }
+      )
+    }
+  );
+};
 const CookiesManager = () => {
+  const [searchParams] = useSearchParams();
+  const requestedProfileId = (searchParams.get("profileId") ?? "").trim();
   const fileInputRef = reactExports.useRef(null);
   const [profiles, setProfiles] = reactExports.useState([]);
   const [isLoadingProfiles, setIsLoadingProfiles] = reactExports.useState(true);
@@ -9622,6 +10002,9 @@ const CookiesManager = () => {
   const [isLoadingCookies, setIsLoadingCookies] = reactExports.useState(false);
   const [error, setError] = reactExports.useState(null);
   const [dragActive, setDragActive] = reactExports.useState(false);
+  const [editingCookie, setEditingCookie] = reactExports.useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = reactExports.useState(false);
+  const [isDeletingCookies, setIsDeletingCookies] = reactExports.useState(/* @__PURE__ */ new Set());
   const filteredProfiles = reactExports.useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
     if (!keyword) {
@@ -9636,16 +10019,31 @@ const CookiesManager = () => {
   const loadProfiles = async () => {
     setIsLoadingProfiles(true);
     setError(null);
-    try {
-      const fetched = await window.api.profiles.getAll();
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: "Unable to load profiles",
+      fallbackMessage: "Failed to load profiles.",
+      context: "cookies.loadProfiles",
+      onError: (message) => setError(message)
+    });
+    if (fetched) {
       setProfiles(fetched);
-      setSelectedProfileId((current) => current || fetched[0]?.id || "");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load profiles.";
-      setError(message);
-    } finally {
+      setSelectedProfileId((current) => {
+        const hasRequestedProfile = requestedProfileId.length > 0 && fetched.some((profile) => profile.id === requestedProfileId);
+        if (hasRequestedProfile) {
+          return requestedProfileId;
+        }
+        const hasCurrentProfile = current.length > 0 && fetched.some((profile) => profile.id === current);
+        if (hasCurrentProfile) {
+          return current;
+        }
+        return fetched[0]?.id || "";
+      });
       setIsLoadingProfiles(false);
+      return;
     }
+    setProfiles([]);
+    setSelectedProfileId("");
+    setIsLoadingProfiles(false);
   };
   const loadCookies = async (profileId, targetFormat) => {
     if (!profileId) {
@@ -9654,23 +10052,26 @@ const CookiesManager = () => {
     }
     setIsLoadingCookies(true);
     setError(null);
-    try {
-      const result = await window.api.cookies.read(profileId, targetFormat);
-      if (!result.success) {
-        throw new Error(result.error ?? "Failed to read cookies.");
+    const result = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.read(profileId, targetFormat), "Failed to read cookies."),
+      {
+        title: "Unable to load cookies",
+        fallbackMessage: "Failed to load cookies.",
+        context: "cookies.load",
+        onError: (message) => {
+          setError(message);
+          setCookies([]);
+        }
       }
+    );
+    if (result) {
       setCookies(result.cookies);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load cookies.";
-      setError(message);
-      setCookies([]);
-    } finally {
-      setIsLoadingCookies(false);
     }
+    setIsLoadingCookies(false);
   };
   reactExports.useEffect(() => {
     void loadProfiles();
-  }, []);
+  }, [requestedProfileId]);
   reactExports.useEffect(() => {
     if (!selectedProfileId) {
       setCookies([]);
@@ -9687,19 +10088,31 @@ const CookiesManager = () => {
   };
   const importCookieFile = async (file) => {
     if (!selectedProfileId) {
-      setError("Please select a profile before importing cookies.");
+      const message = "Please select a profile before importing cookies.";
+      setError(message);
+      emitToast({ title: "No profile selected", message, variant: "warning" });
       return;
     }
     setError(null);
-    const content = await file.text();
-    const importedFormat = detectFormat(file.name);
-    setFormat(importedFormat);
-    const result = await window.api.cookies.write(selectedProfileId, importedFormat, content);
-    if (!result.success) {
-      setError(result.error ?? "Failed to import cookie file.");
-      return;
+    const imported = await runIpcAction(async () => {
+      const content = await file.text();
+      const importedFormat = detectFormat(file.name);
+      setFormat(importedFormat);
+      ensureIpcSuccess(
+        await window.api.cookies.write(selectedProfileId, importedFormat, content),
+        "Failed to import cookie file."
+      );
+      await loadCookies(selectedProfileId, importedFormat);
+      return true;
+    }, {
+      title: "Cookie import failed",
+      fallbackMessage: "Failed to import cookie file.",
+      context: "cookies.import",
+      onError: (message) => setError(message)
+    });
+    if (imported) {
+      emitToast({ title: "Cookies imported", variant: "success" });
     }
-    await loadCookies(selectedProfileId, importedFormat);
   };
   const handleDrop = (event) => {
     event.preventDefault();
@@ -9723,41 +10136,104 @@ const CookiesManager = () => {
   };
   const handleExport = async () => {
     if (!selectedProfileId) {
-      setError("Please select a profile before exporting cookies.");
+      const message = "Please select a profile before exporting cookies.";
+      setError(message);
+      emitToast({ title: "No profile selected", message, variant: "warning" });
       return;
     }
-    try {
-      const result = await window.api.cookies.read(selectedProfileId, format);
-      if (!result.success) {
-        throw new Error(result.error ?? "Failed to export cookies.");
+    const result = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.read(selectedProfileId, format), "Failed to export cookies."),
+      {
+        title: "Cookie export failed",
+        fallbackMessage: "Failed to export cookies.",
+        context: "cookies.export",
+        onError: (message) => setError(message)
       }
-      const extension = format === "json" ? "json" : "txt";
-      const profileName = (selectedProfile?.name ?? "profile").replace(/\s+/g, "_");
-      const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${profileName}_cookies.${extension}`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to export cookies.";
-      setError(message);
+    );
+    if (!result) {
+      return;
     }
+    const extension = format === "json" ? "json" : "txt";
+    const profileName = (selectedProfile?.name ?? "profile").replace(/\s+/g, "_");
+    const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${profileName}_cookies.${extension}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    emitToast({ title: "Cookies exported", variant: "success" });
   };
   const handleClear = async () => {
     if (!selectedProfileId) {
-      setError("Please select a profile before clearing cookies.");
+      const message = "Please select a profile before clearing cookies.";
+      setError(message);
+      emitToast({ title: "No profile selected", message, variant: "warning" });
       return;
     }
-    const result = await window.api.cookies.clear(selectedProfileId);
-    if (!result.success) {
-      setError(result.error ?? "Failed to clear cookies.");
+    const cleared = await runIpcAction(
+      async () => ensureIpcSuccess(await window.api.cookies.clear(selectedProfileId), "Failed to clear cookies."),
+      {
+        title: "Cookie clear failed",
+        fallbackMessage: "Failed to clear cookies.",
+        context: "cookies.clear",
+        onError: (message) => setError(message)
+      }
+    );
+    if (!cleared) {
       return;
     }
     setCookies([]);
+    emitToast({ title: "Cookies cleared", variant: "success" });
+  };
+  const handleEditCookie = (cookie) => {
+    setEditingCookie(cookie);
+    setIsEditModalOpen(true);
+  };
+  const handleDeleteCookie = async (cookie) => {
+    if (!selectedProfileId) {
+      emitToast({ title: "No profile selected", variant: "warning" });
+      return;
+    }
+    const cookieKey = `${cookie.domain}-${cookie.name}`;
+    setIsDeletingCookies((prev) => /* @__PURE__ */ new Set([...prev, cookieKey]));
+    try {
+      const result = await window.api.cookies.delete({
+        profileId: selectedProfileId,
+        domain: cookie.domain,
+        name: cookie.name
+      });
+      if (!result.success) {
+        throw new Error(result.error ?? "Failed to delete cookie");
+      }
+      await loadCookies(selectedProfileId, format);
+      emitToast({
+        title: "Cookie deleted",
+        message: `${cookie.name} has been deleted.`,
+        variant: "success"
+      });
+    } catch (error2) {
+      emitToast({
+        title: "Delete failed",
+        message: error2 instanceof Error ? error2.message : "Failed to delete cookie",
+        variant: "error"
+      });
+    } finally {
+      setIsDeletingCookies((prev) => {
+        const updated = new Set(prev);
+        updated.delete(cookieKey);
+        return updated;
+      });
+    }
+  };
+  const handleModalClose = () => {
+    setIsEditModalOpen(false);
+    setEditingCookie(null);
+  };
+  const handleEditSuccess = async () => {
+    await loadCookies(selectedProfileId, format);
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full flex flex-col pt-4", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "px-8 pb-4 border-b border-white/[0.05] shrink-0", children: [
@@ -9871,23 +10347,68 @@ const CookiesManager = () => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold", children: "Domain" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold", children: "Name" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold", children: "Value" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-24", children: "Path" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-24", children: "Expires" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-20", children: "Path" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-28", children: "Expires" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold w-32", children: "Flags" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-2 text-on-surface-variant font-semibold text-center w-20", children: "Actions" })
           ] }) }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("tbody", { className: "divide-y divide-white/[0.05]", children: [
-            isLoadingCookies && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 5, className: "px-4 py-8 text-center text-on-surface-variant", children: "Loading cookies..." }) }),
-            !isLoadingCookies && cookies.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 5, className: "px-4 py-8 text-center text-on-surface-variant", children: "No cookies available for this profile and format." }) }),
-            !isLoadingCookies && cookies.map((cookie, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary", children: cookie.domain }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary", children: cookie.name }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant truncate max-w-[150px]", children: cookie.value }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant", children: cookie.path || "/" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant opacity-50", children: cookie.expires > 0 ? new Date(cookie.expires * 1e3).toLocaleDateString() : "Session" })
-            ] }, `${cookie.domain}-${cookie.name}-${index}`))
+            isLoadingCookies && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 7, className: "px-4 py-8 text-center text-on-surface-variant", children: "Loading cookies..." }) }),
+            !isLoadingCookies && cookies.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsx("td", { colSpan: 7, className: "px-4 py-8 text-center text-on-surface-variant", children: "No cookies available for this profile and format." }) }),
+            !isLoadingCookies && cookies.map((cookie, index) => {
+              const cookieKey = `${cookie.domain}-${cookie.name}`;
+              const isDeleting = isDeletingCookies.has(cookieKey);
+              return /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-surface-bright/30", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-secondary break-all max-w-[150px]", children: cookie.domain }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-primary font-mono", children: cookie.name }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant break-all max-w-[200px]", children: /* @__PURE__ */ jsxRuntimeExports.jsx("code", { className: "bg-surface-container-lowest/50 px-2 py-1 rounded text-[10px]", children: cookie.value }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant text-xs", children: cookie.path || "/" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant text-xs opacity-75", children: cookie.expires > 0 ? new Date(cookie.expires * 1e3).toLocaleDateString() : "Session" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-on-surface-variant text-xs", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 flex-wrap", children: [
+                  cookie.secure && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "bg-primary/20 text-primary px-2 py-0.5 rounded text-[10px] font-semibold", children: "Secure" }),
+                  cookie.httpOnly && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "bg-secondary/20 text-secondary px-2 py-0.5 rounded text-[10px] font-semibold", children: "HttpOnly" }),
+                  cookie.sameSite && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "bg-tertiary/20 text-tertiary px-2 py-0.5 rounded text-[10px] font-semibold", children: cookie.sameSite })
+                ] }) }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-center", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-1 justify-center", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleEditCookie(cookie),
+                      disabled: isDeleting,
+                      className: "p-1.5 rounded text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                      title: "Edit cookie",
+                      "aria-label": "Edit cookie",
+                      children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "edit" })
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      onClick: () => handleDeleteCookie(cookie),
+                      disabled: isDeleting,
+                      className: "p-1.5 rounded text-error hover:bg-error/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                      title: "Delete cookie",
+                      "aria-label": "Delete cookie",
+                      children: isDeleting ? /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px] animate-spin", children: "hourglass_top" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "delete" })
+                    }
+                  )
+                ] }) })
+              ] }, `${cookieKey}-${index}`);
+            })
           ] })
         ] }) })
       ] })
-    ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      EditCookieModal,
+      {
+        isOpen: isEditModalOpen,
+        onClose: handleModalClose,
+        cookie: editingCookie,
+        profileId: selectedProfileId,
+        onSuccess: handleEditSuccess
+      }
+    )
   ] });
 };
 const BookmarksManager = () => {
@@ -9906,9 +10427,16 @@ const BookmarksManager = () => {
     [profiles, selectedProfileId]
   );
   const loadProfiles = async () => {
-    const fetched = await window.api.profiles.getAll();
-    setProfiles(fetched);
-    setSelectedProfileId((prev) => prev || fetched[0]?.id || "");
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: "Unable to load profiles",
+      fallbackMessage: "Failed to load profiles.",
+      context: "bookmarks.loadProfiles",
+      onError: (message) => setError(message)
+    });
+    if (fetched) {
+      setProfiles(fetched);
+      setSelectedProfileId((prev) => prev || fetched[0]?.id || "");
+    }
   };
   const loadBookmarks = async (profileId) => {
     if (!profileId) {
@@ -9917,15 +10445,16 @@ const BookmarksManager = () => {
     }
     setIsLoading(true);
     setError(null);
-    try {
-      const items = await window.api.bookmarks.list(profileId);
+    const items = await runIpcAction(() => window.api.bookmarks.list(profileId), {
+      title: "Unable to load bookmarks",
+      fallbackMessage: "Failed to load bookmarks.",
+      context: "bookmarks.load",
+      onError: (message) => setError(message)
+    });
+    if (items) {
       setBookmarks(items);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load bookmarks.";
-      setError(message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
   reactExports.useEffect(() => {
     void loadProfiles();
@@ -9936,42 +10465,68 @@ const BookmarksManager = () => {
   const addBookmark = async () => {
     if (!selectedProfileId) return;
     setError(null);
-    const result = await window.api.bookmarks.add(selectedProfileId, {
-      title,
-      url,
-      folder: folder || void 0
+    const added = await runIpcAction(async () => {
+      ensureIpcSuccess(
+        await window.api.bookmarks.add(selectedProfileId, {
+          title,
+          url,
+          folder: folder || void 0
+        }),
+        "Failed to add bookmark."
+      );
+      setTitle("");
+      setUrl("");
+      setFolder("");
+      await loadBookmarks(selectedProfileId);
+      return true;
+    }, {
+      title: "Add bookmark failed",
+      fallbackMessage: "Failed to add bookmark.",
+      context: "bookmarks.add",
+      onError: (message) => setError(message)
     });
-    if (!result.success) {
-      setError(result.error ?? "Failed to add bookmark.");
-      return;
+    if (added) {
+      emitToast({ title: "Bookmark added", variant: "success" });
     }
-    setTitle("");
-    setUrl("");
-    setFolder("");
-    await loadBookmarks(selectedProfileId);
   };
   const deleteBookmark = async (bookmarkId) => {
     if (!selectedProfileId) return;
-    const result = await window.api.bookmarks.delete(selectedProfileId, bookmarkId);
-    if (!result.success) {
-      setError(result.error ?? "Failed to delete bookmark.");
-      return;
+    const removed = await runIpcAction(async () => {
+      ensureIpcSuccess(await window.api.bookmarks.delete(selectedProfileId, bookmarkId), "Failed to delete bookmark.");
+      await loadBookmarks(selectedProfileId);
+      return true;
+    }, {
+      title: "Delete bookmark failed",
+      fallbackMessage: "Failed to delete bookmark.",
+      context: "bookmarks.delete",
+      onError: (message) => setError(message)
+    });
+    if (removed) {
+      emitToast({ title: "Bookmark removed", variant: "success" });
     }
-    await loadBookmarks(selectedProfileId);
   };
   const importJson = async (content) => {
     if (!selectedProfileId) return;
-    const result = await window.api.bookmarks.importJson(selectedProfileId, content);
-    if (!result.success) {
-      setError(result.error ?? "Failed to import bookmarks.");
-      return;
+    const imported = await runIpcAction(async () => {
+      ensureIpcSuccess(await window.api.bookmarks.importJson(selectedProfileId, content), "Failed to import bookmarks.");
+      setJsonInput("");
+      await loadBookmarks(selectedProfileId);
+      return true;
+    }, {
+      title: "Bookmark import failed",
+      fallbackMessage: "Failed to import bookmarks.",
+      context: "bookmarks.import",
+      onError: (message) => setError(message)
+    });
+    if (imported) {
+      emitToast({ title: "Bookmarks imported", variant: "success" });
     }
-    setJsonInput("");
-    await loadBookmarks(selectedProfileId);
   };
   const onImportFromText = async () => {
     if (!jsonInput.trim()) {
-      setError("Paste JSON content before importing.");
+      const message = "Paste JSON content before importing.";
+      setError(message);
+      emitToast({ title: "Missing JSON content", message, variant: "warning" });
       return;
     }
     await importJson(jsonInput);
@@ -10102,6 +10657,8 @@ const BookmarksManager = () => {
   ] });
 };
 const ExtensionsManager = () => {
+  const [searchParams] = useSearchParams();
+  const requestedProfileId = (searchParams.get("profileId") ?? "").trim();
   const [profiles, setProfiles] = reactExports.useState([]);
   const [selectedProfileId, setSelectedProfileId] = reactExports.useState("");
   const [extensions, setExtensions] = reactExports.useState([]);
@@ -10115,9 +10672,29 @@ const ExtensionsManager = () => {
     [profiles, selectedProfileId]
   );
   const loadProfiles = async () => {
-    const fetched = await window.api.profiles.getAll();
-    setProfiles(fetched);
-    setSelectedProfileId((prev) => prev || fetched[0]?.id || "");
+    const fetched = await runIpcAction(() => window.api.profiles.getAll(), {
+      title: "Unable to load profiles",
+      fallbackMessage: "Failed to load profiles.",
+      context: "extensions.loadProfiles",
+      onError: (message) => setError(message)
+    });
+    if (fetched) {
+      setProfiles(fetched);
+      setSelectedProfileId((prev) => {
+        const hasRequestedProfile = requestedProfileId.length > 0 && fetched.some((profile) => profile.id === requestedProfileId);
+        if (hasRequestedProfile) {
+          return requestedProfileId;
+        }
+        const hasCurrentProfile = prev.length > 0 && fetched.some((profile) => profile.id === prev);
+        if (hasCurrentProfile) {
+          return prev;
+        }
+        return fetched[0]?.id || "";
+      });
+      return;
+    }
+    setProfiles([]);
+    setSelectedProfileId("");
   };
   const loadExtensions = async (profileId) => {
     if (!profileId) {
@@ -10126,31 +10703,40 @@ const ExtensionsManager = () => {
     }
     setIsLoading(true);
     setError(null);
-    try {
-      const items = await window.api.extensions.list(profileId);
+    const items = await runIpcAction(() => window.api.extensions.list(profileId), {
+      title: "Unable to load extensions",
+      fallbackMessage: "Failed to load extensions.",
+      context: "extensions.load",
+      onError: (message) => setError(message)
+    });
+    if (items) {
       setExtensions(items);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load extensions.";
-      setError(message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
   reactExports.useEffect(() => {
     void loadProfiles();
-  }, []);
+  }, [requestedProfileId]);
   reactExports.useEffect(() => {
     void loadExtensions(selectedProfileId);
   }, [selectedProfileId]);
   const runAction = async (action) => {
-    setError(null);
-    const result = await action();
-    if (!result.success) {
-      setError(result.error ?? "Extension action failed.");
-      return false;
+    const result = await runIpcAction(async () => {
+      setError(null);
+      ensureIpcSuccess(await action(), "Extension action failed.");
+      await loadExtensions(selectedProfileId);
+      return true;
+    }, {
+      title: "Extension action failed",
+      fallbackMessage: "Unable to complete extension action.",
+      context: "extensions.action",
+      onError: (message) => setError(message)
+    });
+    if (result) {
+      emitToast({ title: "Extension updated", variant: "success" });
+      return true;
     }
-    await loadExtensions(selectedProfileId);
-    return true;
+    return false;
   };
   const onInstallUnpacked = async () => {
     if (!selectedProfileId || !unpackedPath.trim()) return;
@@ -10426,7 +11012,12 @@ const CreateProfileModal = ({
       data.id = initialProfile.id;
     }
     Promise.resolve(onSubmit?.(data)).then(() => onClose()).catch((error) => {
-      console.error("Failed to create profile from modal:", error);
+      handleIpcError(error, {
+        title: "Profile save failed",
+        fallbackMessage: "Unable to save profile.",
+        context: "modal.profileSubmit",
+        silent: true
+      });
     });
   };
   return /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -10596,6 +11187,92 @@ const CreateProfileModal = ({
     }
   );
 };
+function variantClasses(variant) {
+  if (variant === "success") {
+    return "border-tertiary/40 bg-tertiary/10 text-tertiary";
+  }
+  if (variant === "warning") {
+    return "border-secondary/40 bg-secondary/10 text-secondary";
+  }
+  if (variant === "info") {
+    return "border-primary/40 bg-primary/10 text-primary";
+  }
+  return "border-error/40 bg-error/10 text-error";
+}
+function variantIcon(variant) {
+  if (variant === "success") {
+    return "check_circle";
+  }
+  if (variant === "warning") {
+    return "warning";
+  }
+  if (variant === "info") {
+    return "info";
+  }
+  return "error";
+}
+const ToastViewport = () => {
+  const [toasts, setToasts] = reactExports.useState([]);
+  reactExports.useEffect(() => {
+    const listener = (event) => {
+      const customEvent = event;
+      const detail = customEvent.detail;
+      const nextToast = {
+        id: detail.id ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        title: detail.title,
+        message: detail.message,
+        variant: detail.variant ?? "info",
+        durationMs: detail.durationMs ?? 3600
+      };
+      setToasts((prev) => [...prev, nextToast]);
+    };
+    window.addEventListener(APP_TOAST_EVENT, listener);
+    return () => {
+      window.removeEventListener(APP_TOAST_EVENT, listener);
+    };
+  }, []);
+  reactExports.useEffect(() => {
+    if (toasts.length === 0) {
+      return;
+    }
+    const timers = toasts.map(
+      (toast) => window.setTimeout(() => {
+        setToasts((prev) => prev.filter((item) => item.id !== toast.id));
+      }, toast.durationMs)
+    );
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [toasts]);
+  const visibleToasts = reactExports.useMemo(() => toasts.slice(-4), [toasts]);
+  if (visibleToasts.length === 0) {
+    return null;
+  }
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed top-[76px] right-4 z-[140] flex w-[360px] max-w-[calc(100vw-2rem)] flex-col gap-2 pointer-events-none", children: visibleToasts.map((toast) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+    "div",
+    {
+      className: `pointer-events-auto rounded-lg border px-3 py-2 shadow-2xl backdrop-blur-sm ${variantClasses(toast.variant)}`,
+      children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[18px] mt-[1px]", children: variantIcon(toast.variant) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 flex-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-bold leading-5", children: toast.title }),
+          toast.message && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-on-surface-variant leading-4 mt-0.5", children: toast.message })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "button",
+          {
+            type: "button",
+            onClick: () => setToasts((prev) => prev.filter((item) => item.id !== toast.id)),
+            className: "text-on-surface-variant hover:text-on-surface",
+            "aria-label": "Dismiss notification",
+            children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "material-symbols-outlined text-[16px]", children: "close" })
+          }
+        )
+      ] })
+    },
+    toast.id
+  )) });
+};
 const App = () => {
   const [isCreateModalOpen, setCreateModalOpen] = reactExports.useState(false);
   const [editingProfile, setEditingProfile] = reactExports.useState(null);
@@ -10609,28 +11286,51 @@ const App = () => {
   };
   const handleCreateProfile = async (data) => {
     const tags = data.tags ? data.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : void 0;
-    if (data.id) {
-      await window.api.profiles.update(data.id, {
-        name: data.name,
-        proxyId: data.proxyId || void 0,
-        userAgent: data.userAgent || void 0,
-        timezone: data.timezone || void 0,
-        note: data.note || void 0,
-        tags
-      });
-    } else {
-      await window.api.profiles.create({
-        name: data.name,
-        proxyId: data.proxyId || void 0,
-        userAgent: data.userAgent || void 0,
-        timezone: data.timezone || void 0,
-        note: data.note || void 0,
-        tags
-      });
+    const saved = await runIpcAction(async () => {
+      if (data.id) {
+        await window.api.profiles.update(data.id, {
+          name: data.name,
+          proxyId: data.proxyId || void 0,
+          userAgent: data.userAgent || void 0,
+          timezone: data.timezone || void 0,
+          note: data.note || void 0,
+          tags
+        });
+      } else {
+        await window.api.profiles.create({
+          name: data.name,
+          proxyId: data.proxyId || void 0,
+          userAgent: data.userAgent || void 0,
+          timezone: data.timezone || void 0,
+          note: data.note || void 0,
+          tags
+        });
+      }
+    }, {
+      title: data.id ? "Unable to update profile" : "Unable to create profile",
+      fallbackMessage: "Profile save failed.",
+      context: "profiles.save"
+    });
+    if (!saved) {
+      throw new Error("Profile save failed.");
     }
+    emitToast({ title: data.id ? "Profile updated" : "Profile created", variant: "success" });
     window.dispatchEvent(new Event("profiles:changed"));
     setEditingProfile(null);
   };
+  React.useEffect(() => {
+    const unsubscribeUiAlert = window.api.onUiAlert((alert) => {
+      emitToast({
+        title: alert.level.toUpperCase(),
+        message: alert.text,
+        variant: alert.level === "error" ? "error" : alert.level === "warning" ? "warning" : "info",
+        dedupeKey: `ui:alerts:${alert.level}:${alert.text}`
+      });
+    });
+    return () => {
+      unsubscribeUiAlert();
+    };
+  }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsx(BrowserRouter, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex h-screen bg-surface overflow-hidden", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(Header, { onCreateProfile: openCreateModal }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(Sidebar, {}),
@@ -10703,7 +11403,8 @@ const App = () => {
         initialProfile: editingProfile,
         onSubmit: handleCreateProfile
       }
-    )
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(ToastViewport, {})
   ] }) });
 };
 client.createRoot(document.getElementById("root")).render(

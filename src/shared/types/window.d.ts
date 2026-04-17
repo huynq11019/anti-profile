@@ -7,6 +7,10 @@ import type {
   CookieFormat,
   CookieReadResult,
   CookieWriteResult,
+  CookieEditPayload,
+  CookieDeletePayload,
+  CookieEditResult,
+  CookieDeleteResult,
   ProfileExportZipResult,
   BookmarkRecord,
   BookmarkWriteResult,
@@ -50,6 +54,8 @@ declare global {
         read: (profileId: string, format: CookieFormat) => Promise<CookieReadResult>
         write: (profileId: string, format: CookieFormat, content: string) => Promise<CookieWriteResult>
         clear: (profileId: string) => Promise<CookieWriteResult>
+        edit: (payload: CookieEditPayload) => Promise<CookieEditResult>
+        delete: (payload: CookieDeletePayload) => Promise<CookieDeleteResult>
       }
       bookmarks: {
         list: (profileId: string) => Promise<BookmarkRecord[]>

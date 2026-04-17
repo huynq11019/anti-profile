@@ -1,0 +1,31 @@
+[
+  {
+    "domain": ".example.com",
+    "name": "session_id",
+    "value": "abc123def456",
+    "path": "/",
+    "expires": 1735689600,
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "Lax"
+  },
+  {
+    "domain": ".github.com",
+    "name": "user_token",
+    "value": "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+    "path": "/",
+    "expires": 1735689600,
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "Strict"
+  },
+  {
+    "domain": "localhost:3000",
+    "name": "test_cookie",
+    "value": "test_value_with_special_chars_!@#$%",
+    "path": "/api",
+    "expires": 0,
+    "secure": false,
+    "httpOnly": false
+  }
+]

@@ -96,6 +96,8 @@ const IPC_CHANNELS = {
   COOKIES_READ: "cookies:read",
   COOKIES_WRITE: "cookies:write",
   COOKIES_CLEAR: "cookies:clear",
+  COOKIES_EDIT: "cookies:edit",
+  COOKIES_DELETE: "cookies:delete",
   BOOKMARKS_LIST: "bookmarks:list",
   BOOKMARKS_ADD: "bookmarks:add",
   BOOKMARKS_DELETE: "bookmarks:delete",
@@ -150,7 +152,9 @@ const api = {
   cookies: {
     read: (profileId, format) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_READ, profileId, format),
     write: (profileId, format, content) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_WRITE, profileId, format, content),
-    clear: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId)
+    clear: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId),
+    edit: (payload) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_EDIT, payload),
+    delete: (payload) => electron.ipcRenderer.invoke(IPC_CHANNELS.COOKIES_DELETE, payload)
   },
   bookmarks: {
     list: (profileId) => electron.ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_LIST, profileId),

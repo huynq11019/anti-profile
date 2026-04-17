@@ -11,6 +11,10 @@ import {
   CookieFormat,
   CookieReadResult,
   CookieWriteResult,
+  CookieEditPayload,
+  CookieDeletePayload,
+  CookieEditResult,
+  CookieDeleteResult,
   ProfileExportZipResult,
   BookmarkRecord,
   BookmarkWriteResult,
@@ -56,7 +60,11 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.COOKIES_READ, profileId, format),
     write: (profileId: string, format: CookieFormat, content: string): Promise<CookieWriteResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.COOKIES_WRITE, profileId, format, content),
-    clear: (profileId: string): Promise<CookieWriteResult> => ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId)
+    clear: (profileId: string): Promise<CookieWriteResult> => ipcRenderer.invoke(IPC_CHANNELS.COOKIES_CLEAR, profileId),
+    edit: (payload: CookieEditPayload): Promise<CookieEditResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COOKIES_EDIT, payload),
+    delete: (payload: CookieDeletePayload): Promise<CookieDeleteResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.COOKIES_DELETE, payload)
   },
   bookmarks: {
     list: (profileId: string): Promise<BookmarkRecord[]> => ipcRenderer.invoke(IPC_CHANNELS.BOOKMARKS_LIST, profileId),

@@ -7,9 +7,14 @@ import {
   type CookieFormat,
   type CookieReadResult,
   type CookieRecord,
-  type CookieWriteResult
+  type CookieWriteResult,
+  type CookieEditPayload,
+  type CookieDeletePayload,
+  type CookieEditResult,
+  type CookieDeleteResult
 } from '../../shared/types'
 import { ProfileRepository } from '../repositories/profileRepo'
+import { stopProfiles, launchProfiles } from '../browser/launcher'
 
 const profileRepo = new ProfileRepository()
 const CHROMIUM_UNIX_EPOCH_OFFSET_SECONDS = 11_644_473_600
@@ -307,13 +312,94 @@ function ensureProfileExists(profileId: string): void {
   }
 }
 
+function editCookieInChromiumDb(
+  profileId: string,
+  domain: string,
+  oldName: string,
+  newCookie: CookieEditPayload['newCookie']
+): boolean {
+  const result = withCookieDb(profileId, (db) => {
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'")
+      .get() as { name: string } | undefined
+
+    if (!tableExists) {
+      return false
+    }
+
+    const columns = getCookiesTableColumns(db)
+    const nowChromium = toChromiumTimestamp(Math.trunc(Date.now() / 1000))
+
+    const edit = db.transaction(() => {
+      // Delete old cookie
+      const deleteStatement = db.prepare('DELETE FROM cookies WHERE host_key = ? AND name = ?')
+      deleteStatement.run(domain, oldName)
+
+      // Insert new cookie
+      const valuesByColumn: Record<string, unknown> = {
+        creation_utc: nowChromium,
+        host_key: domain,
+        name: newCookie.name,
+        value: newCookie.value,
+        path: newCookie.path || '/',
+        expires_utc: toChromiumTimestamp(newCookie.expires),
+        is_secure: newCookie.secure ? 1 : 0,
+        is_httponly: newCookie.httpOnly ? 1 : 0,
+        last_access_utc: nowChromium,
+        has_expires: newCookie.expires > 0 ? 1 : 0,
+        is_persistent: newCookie.expires > 0 ? 1 : 0,
+        priority: 1,
+        samesite: toChromiumSameSite(newCookie.sameSite),
+        source_scheme: newCookie.secure ? 2 : 1,
+        source_port: 443,
+        last_update_utc: nowChromium,
+        source_type: 0,
+        is_same_party: 0,
+        same_party_context: 0
+      }
+
+      const insertColumns = Object.keys(valuesByColumn).filter((column) => columns.has(column))
+      const placeholders = insertColumns.map(() => '?').join(', ')
+      const insertSql = `INSERT INTO cookies (${insertColumns.join(', ')}) VALUES (${placeholders})`
+      const insertValues = insertColumns.map((column) => valuesByColumn[column])
+      db.prepare(insertSql).run(...insertValues)
+    })
+
+    edit()
+    return true
+  })
+
+  return Boolean(result)
+}
+
+function deleteCookieFromChromiumDb(profileId: string, domain: string, name: string): boolean {
+  const result = withCookieDb(profileId, (db) => {
+    const tableExists = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cookies'")
+      .get() as { name: string } | undefined
+
+    if (!tableExists) {
+      return false
+    }
+
+    const deleteStatement = db.prepare('DELETE FROM cookies WHERE host_key = ? AND name = ?')
+    deleteStatement.run(domain, name)
+    return true
+  })
+
+  return Boolean(result)
+}
+
 export function setupCookieHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.COOKIES_READ, async (_event, profileId: string, format: CookieFormat): Promise<CookieReadResult> => {
     try {
       ensureProfileExists(profileId)
 
       const chromiumCookies = readCookiesFromChromiumDb(profileId)
-      if (chromiumCookies) {
+      // Check if Chromium DB was found AND has cookies
+      // If DB exists but is empty, fall back to file storage
+      if (chromiumCookies !== null && chromiumCookies.length > 0) {
+        console.log(`[Cookies] Loading ${chromiumCookies.length} cookies from Chromium DB for profile ${profileId}`)
         return {
           success: true,
           format,
@@ -324,14 +410,18 @@ export function setupCookieHandlers(): void {
 
       const filePath = getCookieFilePath(profileId, format)
       if (!fs.existsSync(filePath)) {
+        console.log(`[Cookies] No cookies found for profile ${profileId} (no DB, no file)`)
         return { success: true, format, cookies: [], content: '' }
       }
 
+      console.log(`[Cookies] Loading cookies from file for profile ${profileId}: ${filePath}`)
       const content = fs.readFileSync(filePath, 'utf8')
       const cookies = parseCookies(content, format)
+      console.log(`[Cookies] Loaded ${cookies.length} cookies from file (${format} format)`)
       return { success: true, format, cookies, content }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      console.error(`[Cookies] Error reading cookies for profile ${profileId}: ${message}`)
       return { success: false, format, cookies: [], content: '', error: message }
     }
   })
@@ -375,4 +465,69 @@ export function setupCookieHandlers(): void {
       return { success: false, count: 0, error: message }
     }
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.COOKIES_EDIT,
+    async (_event, payload: CookieEditPayload): Promise<CookieEditResult> => {
+      try {
+        ensureProfileExists(payload.profileId)
+
+        // Stop the profile to release the DB lock
+        await stopProfiles([payload.profileId])
+        
+        // Wait for Chromium to release the DB lock
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Edit the cookie
+        const success = editCookieInChromiumDb(
+          payload.profileId,
+          payload.domain,
+          payload.oldName,
+          payload.newCookie
+        )
+
+        if (!success) {
+          return { success: false, error: 'Failed to edit cookie in database' }
+        }
+
+        // Auto-restart the profile
+        await launchProfiles([payload.profileId], profileRepo)
+
+        return { success: true }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.COOKIES_DELETE,
+    async (_event, payload: CookieDeletePayload): Promise<CookieDeleteResult> => {
+      try {
+        ensureProfileExists(payload.profileId)
+
+        // Stop the profile to release the DB lock
+        await stopProfiles([payload.profileId])
+        
+        // Wait for Chromium to release the DB lock
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Delete the cookie
+        const success = deleteCookieFromChromiumDb(payload.profileId, payload.domain, payload.name)
+
+        if (!success) {
+          return { success: false, error: 'Failed to delete cookie from database' }
+        }
+
+        // Auto-restart the profile
+        await launchProfiles([payload.profileId], profileRepo)
+
+        return { success: true }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { success: false, error: message }
+      }
+    }
+  )
 }

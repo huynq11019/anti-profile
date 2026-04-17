@@ -1,9 +1,12 @@
 /// <reference path="../../../shared/types/window.d.ts" />
 import React, { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Profile, ProfileExtensionRecord } from '../../../shared/types'
 import { emitToast, ensureIpcSuccess, runIpcAction } from '../utils/errorHandler'
 
 export const ExtensionsManager: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const requestedProfileId = (searchParams.get('profileId') ?? '').trim()
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [extensions, setExtensions] = useState<ProfileExtensionRecord[]>([])
@@ -28,8 +31,24 @@ export const ExtensionsManager: React.FC = () => {
 
     if (fetched) {
       setProfiles(fetched)
-      setSelectedProfileId((prev) => prev || fetched[0]?.id || '')
+      setSelectedProfileId((prev) => {
+        const hasRequestedProfile = requestedProfileId.length > 0 && fetched.some((profile) => profile.id === requestedProfileId)
+        if (hasRequestedProfile) {
+          return requestedProfileId
+        }
+
+        const hasCurrentProfile = prev.length > 0 && fetched.some((profile) => profile.id === prev)
+        if (hasCurrentProfile) {
+          return prev
+        }
+
+        return fetched[0]?.id || ''
+      })
+      return
     }
+
+    setProfiles([])
+    setSelectedProfileId('')
   }
 
   const loadExtensions = async (profileId: string) => {
@@ -56,7 +75,7 @@ export const ExtensionsManager: React.FC = () => {
 
   useEffect(() => {
     void loadProfiles()
-  }, [])
+  }, [requestedProfileId])
 
   useEffect(() => {
     void loadExtensions(selectedProfileId)

@@ -10,6 +10,8 @@ interface ProfileRowProps {
   readonly onStop: (id: string) => void
   readonly onTogglePin: (id: string) => void
   readonly onOpenFolder: (id: string) => void
+  readonly onOpenExtensions: (id: string) => void
+  readonly onViewCookies: (id: string) => void
   readonly onExportZip: (profile: Profile) => void
   readonly onEdit: (profile: Profile) => void
   readonly onDelete: (id: string) => void
@@ -23,6 +25,8 @@ export const ProfileRow: React.FC<ProfileRowProps> = ({
   onStop,
   onTogglePin,
   onOpenFolder,
+  onOpenExtensions,
+  onViewCookies,
   onExportZip,
   onEdit,
   onDelete,
@@ -77,6 +81,8 @@ export const ProfileRow: React.FC<ProfileRowProps> = ({
   const menuItems = [
     { key: 'edit', label: 'Edit details', icon: 'edit', action: () => onEdit(profile) },
     { key: 'pin', label: profile.isPinned ? 'Unpin profile' : 'Pin profile', icon: 'push_pin', action: () => onTogglePin(profile.id) },
+    { key: 'extensions', label: 'Install extension', icon: 'extension', action: () => onOpenExtensions(profile.id) },
+    { key: 'cookies', label: 'View cookies', icon: 'cookie', action: () => onViewCookies(profile.id) },
     { key: 'folder', label: 'Open profile folder', icon: 'folder_open', action: () => onOpenFolder(profile.id) },
     { key: 'zip', label: 'Export profile ZIP', icon: 'download', action: () => onExportZip(profile) },
     { key: 'delete', label: 'Delete profile', icon: 'delete', action: () => onDelete(profile.id), danger: true }

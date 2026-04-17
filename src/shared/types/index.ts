@@ -34,6 +34,7 @@ export interface UiAlert {
 }
 
 export type CookieFormat = 'json' | 'netscape'
+export type SameSitePolicy = 'Strict' | 'Lax' | 'None' | undefined
 
 export interface CookieRecord {
   domain: string
@@ -43,7 +44,38 @@ export interface CookieRecord {
   expires: number
   secure: boolean
   httpOnly: boolean
-  sameSite?: 'Strict' | 'Lax' | 'None'
+  sameSite?: SameSitePolicy
+}
+
+export interface CookieEditPayload {
+  profileId: string
+  domain: string
+  oldName: string
+  newCookie: {
+    name: string
+    value: string
+    path: string
+    expires: number
+    secure: boolean
+    httpOnly: boolean
+    sameSite: SameSitePolicy
+  }
+}
+
+export interface CookieDeletePayload {
+  profileId: string
+  domain: string
+  name: string
+}
+
+export interface CookieEditResult {
+  success: boolean
+  error?: string
+}
+
+export interface CookieDeleteResult {
+  success: boolean
+  error?: string
 }
 
 export interface CookieReadResult {
@@ -137,6 +169,8 @@ export const IPC_CHANNELS = {
   COOKIES_READ: 'cookies:read',
   COOKIES_WRITE: 'cookies:write',
   COOKIES_CLEAR: 'cookies:clear',
+  COOKIES_EDIT: 'cookies:edit',
+  COOKIES_DELETE: 'cookies:delete',
 
   BOOKMARKS_LIST: 'bookmarks:list',
   BOOKMARKS_ADD: 'bookmarks:add',

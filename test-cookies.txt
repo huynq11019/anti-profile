@@ -1,0 +1,6 @@
+# Netscape HTTP Cookie File
+# This is a generated file!  Do not edit.
+
+.example.com	TRUE	/	TRUE	1735689600	session_id	abc123def456
+.github.com	TRUE	/	TRUE	1735689600	user_token	ghp_16C7e42F292c6912E7710c838347Ae178B4a
+localhost:3000	FALSE	/api	FALSE	0	test_cookie	test_value_with_special_chars_!@#$%

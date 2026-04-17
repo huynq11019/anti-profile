@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Profile, Proxy } from '@shared/types'
 import { ProfileRow } from '@renderer/components/profiles/ProfileRow'
 import { useDashboard } from '@renderer/hooks/useDashboard'
@@ -12,6 +13,7 @@ interface ProfilesProps {
 }
 
 export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfile }) => {
+  const navigate = useNavigate()
   const [bulkAction, setBulkAction] = React.useState<BulkAction>('open')
   const [allProxies, setAllProxies] = React.useState<Proxy[]>([])
   const [showProxyMapModal, setShowProxyMapModal] = React.useState(false)
@@ -216,6 +218,14 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
     })
   }
 
+  const openExtensionsForProfile = (profileId: string) => {
+    navigate(`/extensions?profileId=${encodeURIComponent(profileId)}`)
+  }
+
+  const openCookiesForProfile = (profileId: string) => {
+    navigate(`/cookies?profileId=${encodeURIComponent(profileId)}`)
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* ── Hero Section ─────────────────────────────── */}
@@ -393,6 +403,8 @@ export const Profiles: React.FC<ProfilesProps> = ({ onCreateProfile, onEditProfi
                   onOpenFolder={(id) => {
                     void runProfileAction(() => handleOpenFolder(id))
                   }}
+                  onOpenExtensions={openExtensionsForProfile}
+                  onViewCookies={openCookiesForProfile}
                   onExportZip={(profile) => {
                     void runExportZip(profile)
                   }}
