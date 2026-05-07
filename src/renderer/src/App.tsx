@@ -10,6 +10,7 @@ import { CookiesManager } from '@renderer/pages/CookiesManager'
 import { BookmarksManager } from '@renderer/pages/BookmarksManager'
 import { ExtensionsManager } from '@renderer/pages/ExtensionsManager'
 import { Settings } from '@renderer/pages/Settings'
+import { Logs } from '@renderer/pages/Logs'
 import { CreateProfileModal } from '@renderer/components/modals/CreateProfileModal'
 import { ToastViewport } from '@renderer/components/feedback/ToastViewport'
 import { emitToast, runIpcAction } from '@renderer/utils/errorHandler'
@@ -138,6 +139,10 @@ const App: React.FC = () => {
               <Route
                 path="/bookmarks"
                 element={<BookmarksManager />}
+              />
+              <Route
+                path="/logs"
+                element={<Logs />}
               />
               <Route
                 path="/settings"
