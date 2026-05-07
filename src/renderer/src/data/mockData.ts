@@ -99,6 +99,7 @@ export const NAV_ITEMS = [
   { label: 'Cookies', icon: 'cookie', path: '/cookies' },
   { label: 'Bookmarks', icon: 'bookmarks', path: '/bookmarks' },
   { label: 'Extensions', icon: 'extension', path: '/extensions' },
+  { label: 'Logs', icon: 'terminal', path: '/logs' },
   { label: 'Settings', icon: 'settings', path: '/settings' },
 ]
 
